@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lola Redes · Especialista DoingLio</title>
+<link rel="icon" type="image/svg+xml" href="brain-davinci.svg">
+<link rel="stylesheet" href="theme.css">
+<script src="theme.js" defer></script>
+<style>
+:root{--bg:#080807;--ink:#efe8d8;--muted:#9b9487;--line:#ffffff18;--rose:#e46f9a;--gold:#cba45d}
+*{box-sizing:border-box}body{margin:0;background:#080807;color:var(--ink);font-family:Inter,Arial,sans-serif;min-height:100vh}
+button,input{font:inherit}.wrap{width:min(1160px,94vw);margin:auto}.top{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:20px 0;border-bottom:1px solid var(--line)}
+.top a{color:#ddd0c0;text-decoration:none}.company{border:1px solid #e46f9a55;border-radius:999px;padding:8px 12px;font-size:10px;display:flex;gap:8px;align-items:center}.logout{display:none;border:0;background:transparent;color:#e9b7c9;cursor:pointer;font-size:10px;padding:0}
+.hero{padding:54px 0 28px}.ey{font-size:9px;letter-spacing:.28em;color:var(--rose)}h1{font-size:64px;margin:10px 0 12px}h1 em{color:var(--rose)}.lead{color:#b5aca0;line-height:1.7;max-width:720px}
+.voice{display:inline-block;margin-top:18px;padding:14px 20px;border:1px solid #e46f9a66;border-radius:999px;color:#f2c8d8}
+.channels{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.channel,.panel{border:1px solid var(--line);background:#ffffff05;border-radius:16px;padding:18px}.channel span{font-size:10px;color:var(--muted)}
+.workspace{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}.panel small{color:var(--rose);font-size:8px;letter-spacing:.2em}.panel h2{margin:8px 0}.panel b{font-size:30px}.panel p{font-size:11px;color:var(--muted)}
+.security{margin:18px 0 40px;border-left:3px solid var(--gold);padding:12px 14px;background:#ffffff04;color:#aaa196;font-size:11px}
+#lola-app{opacity:0;pointer-events:none;filter:blur(9px);transition:.5s ease}body.authenticated #lola-app{opacity:1;pointer-events:auto;filter:none}
+body.authenticated #auth-shell{opacity:0;pointer-events:none;transform:scale(1.02)}
+body.authenticated .logout{display:inline}
+#auth-shell{position:fixed;inset:0;z-index:9998;display:grid;place-items:center;padding:22px;background:
+radial-gradient(circle at 50% 38%,#e46f9a1f 0,transparent 32%),
+radial-gradient(circle at 22% 75%,#cba45d10 0,transparent 24%),
+#080807;transition:.45s ease}
+.auth-back{position:fixed;top:22px;left:24px;z-index:2;color:#ddd0c0;text-decoration:none;font-size:13px;padding:10px 12px;border:1px solid #ffffff18;border-radius:999px;background:#ffffff05;backdrop-filter:blur(10px)}.auth-back:hover{border-color:#e46f9a66;color:#f4d6e1}.auth-card{width:min(560px,94vw);border:1px solid #e46f9a55;background:#100f0dcc;border-radius:28px;padding:38px;box-shadow:0 40px 120px #00000080;backdrop-filter:blur(18px);position:relative;overflow:hidden}
+.auth-card:before{content:"";position:absolute;inset:-35% 10% auto;height:220px;background:radial-gradient(circle,#e46f9a22,transparent 65%);pointer-events:none}
+.auth-brand{display:flex;align-items:center;gap:12px;color:#f0d7e1;font-size:11px;letter-spacing:.22em}.auth-brand img{width:34px;height:34px}.auth-kicker{margin:34px 0 10px;color:var(--rose);font-size:10px;letter-spacing:.25em}.auth-card h2{font-family:"Cormorant Garamond",Georgia,serif;font-size:50px;line-height:.98;margin:0 0 16px;font-weight:500}.auth-card h2 em{color:var(--rose);font-style:italic}.auth-copy{color:#aaa196;line-height:1.7;margin:0 0 26px}.auth-form{display:flex;gap:10px;align-items:stretch}.auth-form input{flex:1;min-width:0;border:1px solid #ffffff1f;background:#ffffff08;color:var(--ink);border-radius:14px;padding:15px 16px;outline:none}.auth-form input:focus{border-color:#e46f9a77;box-shadow:0 0 0 3px #e46f9a12}.auth-form button{border:1px solid #e46f9a66;background:#e46f9a17;color:#f4d6e1;border-radius:14px;padding:0 18px;font-weight:800;cursor:pointer}.auth-form button:disabled{opacity:.5;cursor:wait}
+.auth-status{min-height:24px;margin-top:14px;font-size:12px;color:#bdb3aa}.auth-status.ok{color:#f2c8d8}.auth-status.error{color:#ff9a9a}.auth-resend{margin-left:8px;border:1px solid #e46f9a66;background:#e46f9a12;color:#f4d6e1;border-radius:999px;padding:5px 9px;cursor:pointer;font-size:11px}.auth-note{margin-top:22px;padding-top:18px;border-top:1px solid var(--line);font-size:10px;color:#746f68;line-height:1.6}.auth-mail{color:#f0c2d2;font-weight:700}
+@media(max-width:850px){.channels{grid-template-columns:repeat(2,1fr)}.workspace{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.channels,.workspace{grid-template-columns:1fr}.top{flex-direction:column;align-items:flex-start}.auth-card{padding:28px 22px}.auth-card h2{font-size:42px}.auth-form{flex-direction:column}.auth-form button{padding:14px 18px}}
+</style>
+</head>
+<body>
+<section id="auth-shell" aria-live="polite">
+  <a class="auth-back" href="https://duiliomf.github.io/doinglio/">← Volver a DoingLio</a>
+  <div class="auth-card">
+    <div class="auth-brand"><img src="brain-davinci.svg" alt=""><span id="lola-auth-version">DOINGLIO · LOLA REDES · comprobando versión</span></div>
+    <div class="auth-kicker">UNA SOLA IDENTIDAD</div>
+    <h2>Entrá con tu <em>mail.</em></h2>
+    <p class="auth-copy">Nada de usuario. Nada de contraseña. Te mandamos un enlace seguro y Lola te reconoce desde ahí.</p>
+    <form class="auth-form" id="auth-form">
+      <input id="auth-email" type="email" autocomplete="email" inputmode="email" placeholder="tu@email.com" required aria-label="Tu email">
+      <button id="auth-submit" type="submit">Entrar</button>
+    </form>
+    <div class="auth-status" id="auth-status"></div>
+    <div class="auth-note">El acceso usa la identidad central de DoingLio. Las redes sociales se conectan después mediante autorización oficial; Lola no pide ni guarda sus contraseñas.</div>
+  </div>
+</section>
+
+<div id="lola-app" class="wrap" aria-hidden="true">
+<header class="top">
+  <a href="https://duiliomf.github.io/doinglio/">← DoingLio</a>
+  <strong>LOLA REDES</strong>
+  <div class="company"><span id="account-label">CUENTA DOINGLIO</span><button class="logout" id="logout" type="button">SALIR</button></div>
+</header>
+<section class="hero"><div class="ey" id="lola-version">ESPECIALISTA DE DOINGLIO · comprobando versión</div><h1>Hola, soy <em>Lola.</em></h1><p class="lead">¿En qué puedo ayudarte? No necesitás saber de redes. Contame qué querés lograr y yo te voy guiando.</p><div class="voice">🎙 Conversación por voz · <button id="lola-greet" type="button" style="border:0;background:transparent;color:inherit;font:inherit;font-weight:800;cursor:pointer">Escuchar a Lola</button></div></section>
+<section class="channels">
+<article class="channel"><strong>Facebook</strong><br><span>● Sin conectar</span></article>
+<article class="channel"><strong>Instagram</strong><br><span>● Sin conectar</span></article>
+<article class="channel"><strong>WhatsApp</strong><br><span>● Sin conectar</span></article>
+<article class="channel"><strong>LinkedIn</strong><br><span>● Sin conectar</span></article>
+<article class="channel"><strong>TikTok</strong><br><span>● Sin conectar</span></article>
+</section>
+<section class="workspace">
+<article class="panel"><small>BANDEJA</small><h2>Mensajes</h2><b>0</b><p>Conversaciones pendientes.</p></article>
+<article class="panel"><small>CREACIÓN</small><h2>Borradores</h2><b>0</b><p>Contenido en preparación.</p></article>
+<article class="panel"><small>CONTROL</small><h2>Aprobaciones</h2><b>0</b><p>Esperando autorización.</p></article>
+<article class="panel"><small>CALENDARIO</small><h2>Publicaciones</h2><b>0</b><p>Programadas o publicadas.</p></article>
+<article class="panel"><small>ATENCIÓN</small><h2>Alertas</h2><b>0</b><p>Situaciones que requieren acción.</p></article>
+<article class="panel"><small>MEMORIA</small><h2>Actividad</h2><b>0</b><p>Historial de Lola.</p></article>
+</section>
+<div class="security">Tus redes se conectan mediante autorización oficial. Lola no pide ni guarda contraseñas sociales.</div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const SUPABASE_URL='https://apqgrwudkfytwikrsivd.supabase.co';
+const SUPABASE_KEY='sb_publishable_B9NdjnzOKu9BhZGmTM6LGg_wDB3n8lY';
+const sb=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const form=document.getElementById('auth-form');
+const email=document.getElementById('auth-email');
+const submit=document.getElementById('auth-submit');
+const status=document.getElementById('auth-status');
+const app=document.getElementById('lola-app');
+const account=document.getElementById('account-label');
+
+function setStatus(message,type=''){
+  status.className='auth-status'+(type?' '+type:'');
+  status.innerHTML=message;
+}
+function showSession(session){
+  const ok=!!session?.user;
+  document.body.classList.toggle('authenticated',ok);
+  app.setAttribute('aria-hidden',ok?'false':'true');
+  if(ok){
+    const mail=session.user.email||'Cuenta DoingLio';
+    account.textContent=mail;
+  }
+}
+const OTP_PENDING_KEY='doinglio.auth.otp.pending.v1';
+const OTP_RESEND_WAIT_MS=10*60*1000;
+
+function cleanEmail(value){
+  return String(value||'').trim().toLowerCase();
+}
+function readPendingOtp(){
+  try{return JSON.parse(localStorage.getItem(OTP_PENDING_KEY)||'null')}catch(_){return null}
+}
+function rememberPendingOtp(mail){
+  try{localStorage.setItem(OTP_PENDING_KEY,JSON.stringify({email:mail,at:Date.now()}))}catch(_){}
+}
+function clearPendingOtp(){
+  try{localStorage.removeItem(OTP_PENDING_KEY)}catch(_){}
+}
+function hasRecentOtp(mail){
+  const pending=readPendingOtp();
+  return !!(pending&&pending.email===mail&&Number.isFinite(pending.at)&&Date.now()-pending.at<OTP_RESEND_WAIT_MS);
+}
+async function currentSession(){
+  const {data,error}=await sb.auth.getSession();
+  if(error)throw error;
+  return data.session;
+}
+async function init(){
+  setStatus('Comprobando tu identidad…');
+  try{
+    const session=await currentSession();
+    showSession(session);
+    if(session){
+      clearPendingOtp();
+      setStatus('');
+      return;
+    }
+  }catch(error){
+    console.warn('No se pudo recuperar la sesión DoingLio',error);
+  }
+  showSession(null);
+  setStatus('');
+}
+form.addEventListener('submit',async(event)=>{
+  event.preventDefault();
+  const value=cleanEmail(email.value);
+  if(!value)return;
+
+  submit.disabled=true;
+  submit.textContent='Entrando…';
+  setStatus('Comprobando si ya estás conectado…');
+
+  try{
+    // Regla principal: si DoingLio ya tiene una sesión válida, Lola entra directo.
+    const session=await currentSession();
+    if(session?.user){
+      clearPendingOtp();
+      showSession(session);
+      setStatus('Ya estabas identificado en DoingLio. Entrando a Lola…','ok');
+      return;
+    }
+
+    // Evita quemar el límite de Supabase por repetir "Entrar".
+    if(hasRecentOtp(value)){
+      setStatus('Ya enviamos un acceso hace unos minutos a <span class="auth-mail">'+value.replace(/[<>&"']/g,'')+'</span>. Si lo borraste, <button class="auth-resend" id="auth-resend" type="button">reenviar acceso</button>.','ok');
+      return;
+    }
+
+    submit.textContent='Enviando…';
+    setStatus('No hay una sesión activa. Te envío un único acceso seguro…');
+    const redirectTo=new URL('./',window.location.href).href.split('#')[0].split('?')[0];
+    const {error}=await sb.auth.signInWithOtp({
+      email:value,
+      options:{emailRedirectTo:redirectTo,shouldCreateUser:true}
+    });
+    if(error){
+      const limited=/rate limit|email limit|too many/i.test(error.message||'');
+      setStatus(
+        limited
+          ? 'Ya hubo demasiados envíos recientes. No sigas apretando Entrar: usá el último mail recibido o esperá a que se libere el límite.'
+          : 'No pude enviar el acceso: '+error.message,
+        'error'
+      );
+    }else{
+      rememberPendingOtp(value);
+      setStatus('Listo. Te mandamos un único enlace a <span class="auth-mail">'+value.replace(/[<>&"']/g,'')+'</span>. Abrilo y Lola va a conservar la sesión.','ok');
+    }
+  }catch(error){
+    setStatus('No pude comprobar tu sesión: '+(error?.message||error),'error');
+  }finally{
+    submit.disabled=false;
+    submit.textContent='Entrar';
+  }
+});
+status.addEventListener('click',(event)=>{
+  const resend=event.target.closest('#auth-resend');
+  if(!resend)return;
+  clearPendingOtp();
+  setStatus('Listo. Pedimos un nuevo acceso porque el anterior ya no está.');
+  form.requestSubmit();
+});
+document.getElementById('logout').addEventListener('click',async()=>{
+  clearPendingOtp();
+  await sb.auth.signOut();
+  showSession(null);
+  setStatus('');
+});
+sb.auth.onAuthStateChange((event,session)=>{
+  showSession(session);
+  if(session){
+    clearPendingOtp();
+    if(event==='SIGNED_IN'){
+      try{history.replaceState({},document.title,location.pathname+location.search)}catch(_){}
+    }
+  }
+});
+init();
+
+const button=document.getElementById('lola-greet');
+function greet(){
+  if(!('speechSynthesis' in window)){button.textContent='Voz no disponible';return}
+  window.speechSynthesis.cancel();
+  const voice=new SpeechSynthesisUtterance('Hola, soy Lola. ¿En qué puedo ayudarte?');
+  voice.lang='es-AR';
+  window.speechSynthesis.speak(voice);
+}
+button.addEventListener('click',greet);
+try{
+  if(!sessionStorage.getItem('doinglio.lola.saludo')){
+    sessionStorage.setItem('doinglio.lola.saludo','1');
+    setTimeout(()=>{if(document.body.classList.contains('authenticated'))greet()},500);
+  }
+}catch(_){}
+</script>
+</body></html>
