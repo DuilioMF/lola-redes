@@ -12,6 +12,12 @@ test('Lola es un especialista independiente',()=>{
   assert.ok(/^\d+$/.test(version));
 });
 
+test('El enlace compartido de DoingLio no se duplica antes de entrar a Lola',()=>{
+  const html=fs.readFileSync('index.html','utf8');
+  assert.match(html,/body:not\(\.authenticated\) \.site-controls a\{display:none\}/);
+  assert.match(html,/body\.authenticated #auth-shell/);
+});
+
 test('Lola conserva el acceso central',()=>{
   assert.match(html,/createClient/);
   assert.match(html,/signInWithOtp/);
