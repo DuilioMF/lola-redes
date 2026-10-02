@@ -100,7 +100,14 @@ function instagramMessage(message,type=''){
 }
 async function instagramAction(action){
   const {data,error}=await sb.functions.invoke('lola-instagram-oauth',{body:{action}});
-  if(error)throw new Error(data?.message||error.message||'No se pudo conectar con Instagram.');
+  if(error){
+    let message=data?.message||'';
+    try{
+      const payload=await error.context?.clone?.().json();
+      message=payload?.message||message;
+    }catch(_){}
+    throw new Error(message||error.message||'No se pudo conectar con Instagram.');
+  }
   if(data?.error)throw new Error(data.message||'No se pudo conectar con Instagram.');
   return data;
 }
