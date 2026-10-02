@@ -21,3 +21,9 @@ test('Lola conserva el acceso central',()=>{
 test('Lola conserva sus cinco canales',()=>{
   for(const channel of ['Facebook','Instagram','WhatsApp','LinkedIn','TikTok']) assert.ok(html.includes(channel));
 });
+
+test('Lola usa una URL canónica de retorno para Magic Link',()=>{
+  assert.match(html,/const LOLA_PUBLIC_URL='https:\/\/duiliomf\.github\.io\/lola-redes\/'/);
+  assert.match(html,/emailRedirectTo:redirectTo/);
+  assert.match(html,/const redirectTo=LOLA_PUBLIC_URL/);
+});

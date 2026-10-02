@@ -31,7 +31,7 @@
       if(!/^\d+$/.test(v))throw Error('bad version');
       let label='L'+Number(v);
       try{
-        const p=await fetch('https://duiliomf.github.io/doinglio/BUILD?cache='+Date.now(),{cache:'no-store'});
+        const p=await fetch('https://raw.githubusercontent.com/DuilioMF/doinglio/main/BUILD?cache='+Date.now(),{cache:'no-store'});
         const d=(await p.text()).trim();
         if(p.ok&&/^\d+$/.test(d))label='D'+Number(d)+'.L'+Number(v);
       }catch(_){}

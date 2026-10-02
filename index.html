@@ -78,6 +78,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL='https://apqgrwudkfytwikrsivd.supabase.co';
 const SUPABASE_KEY='sb_publishable_B9NdjnzOKu9BhZGmTM6LGg_wDB3n8lY';
+const LOLA_PUBLIC_URL='https://duiliomf.github.io/lola-redes/';
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const form=document.getElementById('auth-form');
 const email=document.getElementById('auth-email');
@@ -166,7 +167,7 @@ form.addEventListener('submit',async(event)=>{
 
     submit.textContent='Enviando…';
     setStatus('No hay una sesión activa. Te envío un único acceso seguro…');
-    const redirectTo=new URL('./',window.location.href).href.split('#')[0].split('?')[0];
+    const redirectTo=LOLA_PUBLIC_URL;
     const {error}=await sb.auth.signInWithOtp({
       email:value,
       options:{emailRedirectTo:redirectTo,shouldCreateUser:true}
