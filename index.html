@@ -28,7 +28,7 @@ radial-gradient(circle at 22% 75%,#cba45d10 0,transparent 24%),
 .auth-card:before{content:"";position:absolute;inset:-35% 10% auto;height:220px;background:radial-gradient(circle,#e46f9a22,transparent 65%);pointer-events:none}
 .auth-brand{display:flex;align-items:center;gap:12px;color:#f0d7e1;font-size:11px;letter-spacing:.22em}.auth-brand img{width:34px;height:34px}.auth-kicker{margin:34px 0 10px;color:var(--rose);font-size:10px;letter-spacing:.25em}.auth-card h2{font-family:"Cormorant Garamond",Georgia,serif;font-size:50px;line-height:.98;margin:0 0 16px;font-weight:500}.auth-card h2 em{color:var(--rose);font-style:italic}.auth-copy{color:#aaa196;line-height:1.7;margin:0 0 26px}.auth-form{display:flex;gap:10px;align-items:stretch}.auth-form input{flex:1;min-width:0;border:1px solid #ffffff1f;background:#ffffff08;color:var(--ink);border-radius:14px;padding:15px 16px;outline:none}.auth-form input:focus{border-color:#e46f9a77;box-shadow:0 0 0 3px #e46f9a12}.auth-form button{border:1px solid #e46f9a66;background:#e46f9a17;color:#f4d6e1;border-radius:14px;padding:0 18px;font-weight:800;cursor:pointer}.auth-form button:disabled{opacity:.5;cursor:wait}
 .auth-status{min-height:24px;margin-top:14px;font-size:12px;color:#bdb3aa}.auth-status.ok{color:#f2c8d8}.auth-status.error{color:#ff9a9a}.auth-resend{margin-left:8px;border:1px solid #e46f9a66;background:#e46f9a12;color:#f4d6e1;border-radius:999px;padding:5px 9px;cursor:pointer;font-size:11px}.auth-note{margin-top:22px;padding-top:18px;border-top:1px solid var(--line);font-size:10px;color:#746f68;line-height:1.6}.auth-mail{color:#f0c2d2;font-weight:700}
-.ig-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.ig-actions button{border:1px solid #e46f9a66;background:#e46f9a17;color:#f4d6e1;border-radius:999px;padding:8px 10px;font-size:10px;font-weight:700;cursor:pointer}.ig-actions button:disabled{opacity:.55;cursor:wait}.ig-actions .ig-disconnect{border-color:#ffffff24;background:#ffffff08;color:#c9c0b7}.ig-note{display:block;min-height:28px;margin-top:8px;color:#9b9487;font-size:9px;line-height:1.5}.ig-note.error{color:#ff9a9a}.ig-note.ok{color:#f2c8d8}.channel.connected{border-color:#5dc58a66}
+.ig-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.ig-actions button{border:1px solid #e46f9a66;background:#e46f9a17;color:#f4d6e1;border-radius:999px;padding:8px 10px;font-size:10px;font-weight:700;cursor:pointer}.ig-actions button:disabled{opacity:.55;cursor:wait}.ig-actions .ig-create{border-color:#ffffff2d;background:#ffffff08;color:#ddd0c0}.ig-actions .ig-disconnect{border-color:#ffffff24;background:#ffffff08;color:#c9c0b7}.ig-note{display:block;min-height:28px;margin-top:8px;color:#9b9487;font-size:9px;line-height:1.5}.ig-note.error{color:#ff9a9a}.ig-note.ok{color:#f2c8d8}.channel.connected{border-color:#5dc58a66}
 @media(max-width:850px){.channels{grid-template-columns:repeat(2,1fr)}.workspace{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.channels,.workspace{grid-template-columns:1fr}.top{flex-direction:column;align-items:flex-start}.auth-card{padding:28px 22px}.auth-card h2{font-size:42px}.auth-form{flex-direction:column}.auth-form button{padding:14px 18px}}
 </style>
 </head>
@@ -57,7 +57,7 @@ radial-gradient(circle at 22% 75%,#cba45d10 0,transparent 24%),
 <section class="hero"><div class="ey" id="lola-version">ESPECIALISTA DE DOINGLIO · comprobando versión</div><h1>Hola, soy <em>Lola.</em></h1><p class="lead">¿En qué puedo ayudarte? No necesitás saber de redes. Contame qué querés lograr y yo te voy guiando.</p><div class="voice">🎙 Conversación por voz · <button id="lola-greet" type="button" style="border:0;background:transparent;color:inherit;font:inherit;font-weight:800;cursor:pointer">Escuchar a Lola</button></div></section>
 <section class="channels">
 <article class="channel"><strong>Facebook</strong><br><span>● Sin conectar</span></article>
-<article class="channel" id="instagram-channel"><strong>Instagram</strong><br><span id="instagram-status">● Sin conectar</span><div class="ig-actions"><button id="instagram-connect" type="button">Conectar Instagram</button><button id="instagram-disconnect" class="ig-disconnect" type="button" hidden>Desconectar</button></div><small id="instagram-note" class="ig-note">Cuenta profesional: Empresa o Creador.</small></article>
+<article class="channel" id="instagram-channel"><strong>Instagram</strong><br><span id="instagram-status">● Sin conectar</span><div class="ig-actions"><button id="instagram-connect" type="button">Ya tengo Instagram</button><button id="instagram-create" class="ig-create" type="button">Crear cuenta de Instagram</button><button id="instagram-disconnect" class="ig-disconnect" type="button" hidden>Desconectar</button></div><small id="instagram-note" class="ig-note">Si todavía no tenés cuenta, creala primero. Después volvé a Lola y elegí “Ya tengo Instagram”.</small></article>
 <article class="channel"><strong>WhatsApp</strong><br><span>● Sin conectar</span></article>
 <article class="channel"><strong>LinkedIn</strong><br><span>● Sin conectar</span></article>
 <article class="channel"><strong>TikTok</strong><br><span>● Sin conectar</span></article>
@@ -91,6 +91,7 @@ const instagramChannel=document.getElementById('instagram-channel');
 const instagramStatus=document.getElementById('instagram-status');
 const instagramNote=document.getElementById('instagram-note');
 const instagramConnect=document.getElementById('instagram-connect');
+const instagramCreate=document.getElementById('instagram-create');
 const instagramDisconnect=document.getElementById('instagram-disconnect');
 
 function instagramMessage(message,type=''){
@@ -119,9 +120,10 @@ async function refreshInstagramStatus(){
     instagramChannel.classList.toggle('connected',connected);
     instagramStatus.textContent=connected?'● Conectada como @'+(data.account?.username||'Instagram'):'● Sin conectar';
     instagramConnect.hidden=connected;
+    instagramCreate.hidden=connected;
     instagramDisconnect.hidden=!connected;
     instagramConnect.disabled=false;
-    instagramMessage(connected?'Cuenta vinculada. Ya podés volver a Lola.':'Cuenta profesional: Empresa o Creador.',connected?'ok':'');
+    instagramMessage(connected?'Cuenta vinculada. Ya podés volver a Lola.':'¿No tenés Instagram? Creá la cuenta primero. Cuando termines, volvé acá y conectala.',connected?'ok':'');
   }catch(error){
     instagramConnect.disabled=false;
     instagramMessage(error.message||'No se pudo consultar el estado de Instagram.','error');
@@ -268,6 +270,10 @@ sb.auth.onAuthStateChange((event,session)=>{
   }
 });
 init();
+instagramCreate.addEventListener('click',()=>{
+  instagramMessage('Instagram se abre en otra pestaña. Creá la cuenta y después volvé a Lola para conectarla.');
+  window.open('https://www.instagram.com/accounts/signup/','_blank','noopener,noreferrer');
+});
 instagramConnect.addEventListener('click',async()=>{
   instagramConnect.disabled=true;
   instagramMessage('Abriendo Instagram para autorizar…');
@@ -289,6 +295,7 @@ instagramDisconnect.addEventListener('click',async()=>{
     instagramDisconnect.hidden=true;
     instagramDisconnect.disabled=false;
     instagramConnect.hidden=false;
+    instagramCreate.hidden=false;
     instagramMessage('Instagram se desconectó.','');
   }catch(error){
     instagramDisconnect.disabled=false;
