@@ -52,3 +52,13 @@ test('OAuth oficial valida sesión y protege los tokens',()=>{
   assert.ok(migration.toLowerCase().includes('enable row level security'));
   assert.ok(migration.includes('revoke all on table public.lola_instagram_connections from anon, authenticated, public'));
 });
+
+test('Lola guía la creación, preparación y conexión de Instagram sin exponer el bloqueo técnico',()=>{
+  assert.match(html,/id="instagram-guide"/);
+  assert.match(html,/LOLA TE ACOMPAÑA/);
+  assert.match(html,/Creador o Empresa/);
+  assert.match(html,/revisá la vista previa/);
+  assert.match(html,/instagram_not_configured/);
+  assert.match(html,/todavía se está preparando/);
+  assert.doesNotMatch(html,/Falta configurar META_APP_ID/);
+});
