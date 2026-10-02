@@ -62,3 +62,8 @@ test('Lola guía la creación, preparación y conexión de Instagram sin exponer
   assert.match(html,/todavía se está preparando/);
   assert.doesNotMatch(html,/Falta configurar META_APP_ID/);
 });
+
+test('Crear cuenta de Instagram abre un enlace normal en otra pestaña',()=>{
+  assert.match(html,/<a id="instagram-create" class="ig-create" href="https:\/\/www\.instagram\.com\/accounts\/signup\/" target="_blank" rel="noopener noreferrer">/);
+  assert.doesNotMatch(html,/window\.open\('https:\/\/www\.instagram\.com\/accounts\/signup\//);
+});
