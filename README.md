@@ -12,11 +12,11 @@ La identidad de acceso sigue usando el servicio central de DoingLio; el código 
 
 ## Conectar Instagram
 
-Lola usa el acceso oficial **Instagram Login** de Meta; no utiliza servicios intermediarios. La primera prueba requiere una cuenta profesional de Instagram (Empresa o Creador) y una app de Meta configurada para Instagram Login.
+Lola usa el acceso oficial **Instagram Login** de Meta; no utiliza servicios intermediarios. La persona usuaria crea o conecta su cuenta desde Lola, que la guía con pasos simples. Para publicar necesita una cuenta profesional de Instagram (Empresa o Creador).
 
-En Supabase Edge Function Secrets se deben cargar `META_APP_ID` y `META_APP_SECRET`. En la configuración de la app de Meta, registrar como OAuth redirect URI:
+La configuración de la aplicación de Lola en Meta se realiza una sola vez por el equipo administrador. Sus credenciales (`META_APP_ID` y `META_APP_SECRET`) se guardan como secretos de Supabase Edge Functions, nunca en el navegador ni en el código. En Meta se registra como OAuth redirect URI:
 
 `https://apqgrwudkfytwikrsivd.supabase.co/functions/v1/lola-instagram-oauth`
 
-Habilitar los permisos `instagram_business_basic` e `instagram_business_content_publish`. Los tokens se guardan en una tabla protegida con RLS y nunca se devuelven al navegador. La cuenta conectada se muestra en Lola Redes.
+La app necesita los permisos `instagram_business_basic` e `instagram_business_content_publish`. Los tokens de usuario se guardan en una tabla protegida con RLS y nunca se devuelven al navegador. Si la configuración aún no está lista, Lola muestra un aviso claro y no pide a la persona que configure Meta o Supabase.
 
