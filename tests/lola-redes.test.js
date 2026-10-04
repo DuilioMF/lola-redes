@@ -77,3 +77,12 @@ test('L6 permite cambiar de perfil de Instagram sin heredar la sesión principal
   assert.ok(backend.includes('url.searchParams.set("force_reauth", "true")'));
   assert.ok(backend.includes('url.searchParams.set("enable_fb_login", "false")'));
 });
+
+
+test('L7 fuerza autenticacion real al cambiar de cuenta Instagram',()=>{
+  const backend=fs.readFileSync('supabase/functions/lola-instagram-oauth/index.ts','utf8');
+  assert.ok(backend.includes('body.action === "start" || body.action === "switch"'));
+  assert.ok(backend.includes('url.searchParams.set("force_authentication", "1")'));
+  assert.ok(backend.includes('url.searchParams.set("enable_fb_login", "0")'));
+  assert.ok(html.includes("instagramAction('switch')"));
+});
