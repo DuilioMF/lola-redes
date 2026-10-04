@@ -69,7 +69,7 @@ test('Crear cuenta de Instagram abre un enlace normal en otra pestaña',()=>{
 });
 
 
-test('L9 guarda varias cuentas de Instagram y selecciona una activa',()=>{
+test('L9 guarda varias cuentas de Instagram y selecciona una activa sin mover la conexión anterior',()=>{
   const backend=fs.readFileSync('supabase/functions/lola-instagram-oauth/index.ts','utf8');
   const composer=fs.readFileSync('supabase/functions/lola-instagram-compose/index.ts','utf8');
   const migration=fs.readFileSync('supabase/migrations/202610040001_lola_instagram_multicuenta.sql','utf8');
@@ -81,16 +81,18 @@ test('L9 guarda varias cuentas de Instagram y selecciona una activa',()=>{
   assert.doesNotMatch(html,/LOLA_LOCAL_URL|localInstagramHealth|Lola Local|127\.0\.0\.1:8791/);
 
   assert.ok(backend.includes('lola_instagram_accounts'));
+  assert.ok(backend.includes('lola_instagram_connections'));
+  assert.ok(backend.includes('lola_instagram_profile_selection'));
   assert.ok(backend.includes('active_account'));
   assert.ok(backend.includes('body.action === "select"'));
   assert.ok(backend.includes('on_conflict=user_id,instagram_user_id'));
-  assert.doesNotMatch(backend,/lola_instagram_connections/);
 
   assert.ok(composer.includes('lola_instagram_accounts'));
-  assert.ok(composer.includes('selected=eq.true'));
-  assert.doesNotMatch(composer,/lola_instagram_connections/);
+  assert.ok(composer.includes('lola_instagram_connections'));
+  assert.ok(composer.includes('lola_instagram_profile_selection'));
+  assert.ok(composer.includes('getSelectedInstagramUserId'));
 
   assert.ok(migration.includes('lola_instagram_accounts'));
-  assert.ok(migration.includes('lola_instagram_accounts_one_selected_per_user'));
-  assert.ok(migration.includes('from public.lola_instagram_connections'));
+  assert.ok(migration.includes('lola_instagram_profile_selection'));
+  assert.doesNotMatch(migration,/insert\s+into\s+public\.lola_instagram_accounts[\s\S]*from\s+public\.lola_instagram_connections/i);
 });
