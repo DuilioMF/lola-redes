@@ -75,7 +75,7 @@ test('L6 permite cambiar de perfil de Instagram sin heredar la sesión principal
   assert.match(html,/Cambiar perfil/);
   assert.match(html,/La conexión actual se conserva si cancelás/);
   assert.ok(backend.includes('url.searchParams.set("force_reauth", "true")'));
-  assert.ok(backend.includes('url.searchParams.set("enable_fb_login", "false")'));
+  assert.ok(backend.includes('url.searchParams.set("enable_fb_login", "0")'));
 });
 
 
