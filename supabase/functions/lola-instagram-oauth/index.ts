@@ -113,7 +113,7 @@ async function removeConnection(userId: string): Promise<void> {
   if (!response.ok) throw new Error("No se pudo desconectar Instagram.");
 }
 
-async function authorizeUrl(userId: string): Promise<string> {
+async function authorizeUrl(userId: string, forceAccountLogin = false): Promise<string> {
   const appId = secret("META_APP_ID");
   const signingKey = secret("META_APP_SECRET");
   const callback = secret("SUPABASE_URL").replace(/\/$/, "") + "/functions/v1/" + FUNCTION_NAME;
@@ -126,10 +126,17 @@ async function authorizeUrl(userId: string): Promise<string> {
   // Siempre pedimos una autenticación fresca para que una sesión previa de Instagram
   // no ate silenciosamente Lola al perfil principal. La persona elige qué cuenta usar
   // en la pantalla oficial de Instagram; Lola nunca ve ni guarda la contraseña.
-  url.searchParams.set("enable_fb_login", "false");
+  url.searchParams.set("enable_fb_login", "0");
   url.searchParams.set("force_reauth", "true");
+  url.searchParams.set("force_authentication", "1");
   url.searchParams.set("state", state);
-  return url.toString();
+  if (!forceAccountLogin) return url.toString();
+
+  const login = new URL("https://www.instagram.com/accounts/login/");
+  login.searchParams.set("force_authentication", "1");
+  login.searchParams.set("enable_fb_login", "0");
+  login.searchParams.set("next", url.pathname + url.search);
+  return login.toString();
 }
 
 async function exchangeCode(code: string): Promise<{ token: string; expiresIn: number }> {
@@ -197,8 +204,8 @@ Deno.serve(async (request: Request) => {
     const user = await authenticatedUser(request);
     if (!user) return json({ error: "unauthorized", message: "Volvé a entrar a Lola con tu mail." }, 401);
     const body = await request.json().catch(() => ({}));
-    if (body.action === "start") {
-      try { return json({ authorize_url: await authorizeUrl(user.id) }); }
+    if (body.action === "start" || body.action === "switch") {
+      try { return json({ authorize_url: await authorizeUrl(user.id, body.action === "switch") }); }
       catch (error) {
         return json({ error: "instagram_not_configured", message: error instanceof Error ? error.message : "Falta configurar Instagram." }, 503);
       }
