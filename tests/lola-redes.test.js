@@ -69,30 +69,42 @@ test('Crear cuenta de Instagram abre un enlace normal en otra pestaña',()=>{
 });
 
 
-test('L9 guarda varias cuentas de Instagram y selecciona una activa sin mover la conexión anterior',()=>{
+test('L10 separa el permiso de Instagram del usuario de Lola',()=>{
   const backend=fs.readFileSync('supabase/functions/lola-instagram-oauth/index.ts','utf8');
   const composer=fs.readFileSync('supabase/functions/lola-instagram-compose/index.ts','utf8');
-  const migration=fs.readFileSync('supabase/migrations/202610040001_lola_instagram_multicuenta.sql','utf8');
+  const migration=fs.readFileSync('supabase/migrations/202610040002_lola_instagram_profiles_global.sql','utf8');
 
   assert.match(html,/id="instagram-profile-select"/);
-  assert.match(html,/Agregar cuenta/);
+  assert.match(html,/id="instagram-available-select"/);
+  assert.match(html,/id="instagram-link-existing"/);
+  assert.match(html,/Autorizar otra cuenta/);
+  assert.match(html,/Usar cuenta ya autorizada/);
+  assert.match(html,/same_account/);
   assert.ok(html.includes("instagramAction('select'"));
   assert.ok(html.includes("instagramAction('add'"));
+  assert.ok(html.includes("instagramAction('link'"));
   assert.doesNotMatch(html,/LOLA_LOCAL_URL|localInstagramHealth|Lola Local|127\.0\.0\.1:8791/);
 
-  assert.ok(backend.includes('lola_instagram_accounts'));
-  assert.ok(backend.includes('lola_instagram_connections'));
+  assert.ok(backend.includes('lola_instagram_profiles'));
+  assert.ok(backend.includes('lola_instagram_profile_access'));
   assert.ok(backend.includes('lola_instagram_profile_selection'));
   assert.ok(backend.includes('active_account'));
-  assert.ok(backend.includes('body.action === "select"'));
-  assert.ok(backend.includes('on_conflict=user_id,instagram_user_id'));
+  assert.ok(backend.includes('available_accounts'));
+  assert.ok(backend.includes('body.action === "link"'));
+  assert.ok(backend.includes('on_conflict=instagram_user_id'));
+  assert.doesNotMatch(backend,/lola_instagram_accounts/);
+  assert.doesNotMatch(backend,/lola_instagram_connections/);
 
-  assert.ok(composer.includes('lola_instagram_accounts'));
-  assert.ok(composer.includes('lola_instagram_connections'));
+  assert.ok(composer.includes('lola_instagram_profiles'));
+  assert.ok(composer.includes('lola_instagram_profile_access'));
   assert.ok(composer.includes('lola_instagram_profile_selection'));
   assert.ok(composer.includes('getSelectedInstagramUserId'));
+  assert.doesNotMatch(composer,/lola_instagram_accounts/);
+  assert.doesNotMatch(composer,/lola_instagram_connections/);
 
-  assert.ok(migration.includes('lola_instagram_accounts'));
-  assert.ok(migration.includes('lola_instagram_profile_selection'));
-  assert.doesNotMatch(migration,/insert\s+into\s+public\.lola_instagram_accounts[\s\S]*from\s+public\.lola_instagram_connections/i);
+  assert.ok(migration.includes('create table if not exists public.lola_instagram_profiles'));
+  assert.ok(migration.includes('create table if not exists public.lola_instagram_profile_access'));
+  assert.ok(migration.includes('from public.lola_instagram_accounts'));
+  assert.ok(migration.includes('from public.lola_instagram_connections'));
+  assert.ok(migration.includes('connected_by uuid'));
 });

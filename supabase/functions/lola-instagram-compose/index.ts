@@ -38,42 +38,61 @@ function adminHeaders(): HeadersInit {
   return { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json" };
 }
 
-async function fetchConnection(table: string, userId: string, instagramUserId?: string): Promise<any | null> {
-  let query = "?select=instagram_user_id,username,access_token,expires_at&user_id=eq." + encodeURIComponent(userId);
-  if (instagramUserId) query += "&instagram_user_id=eq." + encodeURIComponent(instagramUserId);
-  query += "&order=connected_at.asc&limit=1";
-  const response = await fetch(secret("SUPABASE_URL") + "/rest/v1/" + table + query, { headers: adminHeaders() });
+async function getSelectedInstagramUserId(userId: string): Promise<string | null> {
+  const response = await fetch(
+    secret("SUPABASE_URL") + "/rest/v1/lola_instagram_profile_selection" +
+      "?select=instagram_user_id&user_id=eq." + encodeURIComponent(userId) + "&limit=1",
+    { headers: adminHeaders() },
+  );
+  if (!response.ok) throw new Error("No pude consultar el perfil activo de Instagram.");
+  const rows = await response.json();
+  return Array.isArray(rows) && rows.length
+    ? String(rows[0].instagram_user_id || "") || null
+    : null;
+}
+
+async function getAccessIds(userId: string): Promise<string[]> {
+  const response = await fetch(
+    secret("SUPABASE_URL") + "/rest/v1/lola_instagram_profile_access" +
+      "?select=instagram_user_id&user_id=eq." + encodeURIComponent(userId),
+    { headers: adminHeaders() },
+  );
+  if (!response.ok) throw new Error("No pude consultar los perfiles habilitados.");
+  const rows = await response.json();
+  return Array.isArray(rows)
+    ? rows.map((row) => String(row.instagram_user_id || "")).filter(Boolean)
+    : [];
+}
+
+async function fetchProfile(instagramUserId: string): Promise<any | null> {
+  const url =
+    secret("SUPABASE_URL") + "/rest/v1/lola_instagram_profiles" +
+    "?select=instagram_user_id,username,access_token,expires_at" +
+    "&instagram_user_id=eq." + encodeURIComponent(instagramUserId) +
+    "&limit=1";
+  const response = await fetch(url, { headers: adminHeaders() });
   if (!response.ok) throw new Error("No pude consultar la conexión de Instagram.");
   const rows = await response.json();
   return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
 
-async function getSelectedInstagramUserId(userId: string): Promise<string | null> {
-  const response = await fetch(
-    secret("SUPABASE_URL") + "/rest/v1/lola_instagram_profile_selection" +
-      "?select=instagram_user_id&user_id=eq." + encodeURIComponent(userId) + "&limit=1",
-    { headers: adminHeaders() }
-  );
-  if (!response.ok) throw new Error("No pude consultar el perfil activo de Instagram.");
-  const rows = await response.json();
-  return Array.isArray(rows) && rows.length ? String(rows[0].instagram_user_id || "") || null : null;
-}
-
 async function getConnection(userId: string): Promise<any | null> {
+  const accessIds = await getAccessIds(userId);
+  if (!accessIds.length) return null;
+
   const selectedId = await getSelectedInstagramUserId(userId);
-  if (selectedId) {
-    const modern = await fetchConnection("lola_instagram_accounts", userId, selectedId);
-    if (modern) return modern;
-    const legacy = await fetchConnection("lola_instagram_connections", userId, selectedId);
-    if (legacy) return legacy;
+  if (selectedId && accessIds.includes(selectedId)) {
+    const selected = await fetchProfile(selectedId);
+    if (selected) return selected;
   }
 
-  const modernFallback = await fetchConnection("lola_instagram_accounts", userId);
-  if (modernFallback) return modernFallback;
-  return await fetchConnection("lola_instagram_connections", userId);
+  return await fetchProfile(accessIds[0]);
 }
 
-async function saveDraft(userId: string, payload: { imagePath: string; imageUrl: string; brief: string; caption: string }) {
+async function saveDraft(
+  userId: string,
+  payload: { imagePath: string; imageUrl: string; brief: string; caption: string },
+) {
   const url = secret("SUPABASE_URL") + "/rest/v1/lola_instagram_posts";
   const response = await fetch(url, {
     method: "POST",
@@ -93,9 +112,16 @@ async function saveDraft(userId: string, payload: { imagePath: string; imageUrl:
   return rows?.[0] || null;
 }
 
-async function markPublished(userId: string, draftId: string | null, instagramUserId: string, mediaId: string) {
+async function markPublished(
+  userId: string,
+  draftId: string | null,
+  instagramUserId: string,
+  mediaId: string,
+) {
   if (!draftId) return;
-  const url = secret("SUPABASE_URL") + "/rest/v1/lola_instagram_posts?id=eq." + encodeURIComponent(draftId) + "&user_id=eq." + encodeURIComponent(userId);
+  const url =
+    secret("SUPABASE_URL") + "/rest/v1/lola_instagram_posts?id=eq." +
+    encodeURIComponent(draftId) + "&user_id=eq." + encodeURIComponent(userId);
   await fetch(url, {
     method: "PATCH",
     headers: { ...adminHeaders(), Prefer: "return=minimal" },
@@ -112,18 +138,30 @@ async function markPublished(userId: string, draftId: string | null, instagramUs
 
 async function markError(userId: string, draftId: string | null, message: string) {
   if (!draftId) return;
-  const url = secret("SUPABASE_URL") + "/rest/v1/lola_instagram_posts?id=eq." + encodeURIComponent(draftId) + "&user_id=eq." + encodeURIComponent(userId);
+  const url =
+    secret("SUPABASE_URL") + "/rest/v1/lola_instagram_posts?id=eq." +
+    encodeURIComponent(draftId) + "&user_id=eq." + encodeURIComponent(userId);
   await fetch(url, {
     method: "PATCH",
     headers: { ...adminHeaders(), Prefer: "return=minimal" },
-    body: JSON.stringify({ status: "error", error_message: message.slice(0, 1000), updated_at: new Date().toISOString() }),
+    body: JSON.stringify({
+      status: "error",
+      error_message: message.slice(0, 1000),
+      updated_at: new Date().toISOString(),
+    }),
   });
 }
 
 function extractOutputText(result: any): string {
-  if (typeof result?.output_text === "string" && result.output_text.trim()) return result.output_text.trim();
+  if (typeof result?.output_text === "string" && result.output_text.trim()) {
+    return result.output_text.trim();
+  }
   const parts = result?.output?.flatMap((o: any) => o?.content || []) || [];
-  return parts.map((p: any) => p?.text).filter((t: any) => typeof t === "string" && t.trim()).join("\n").trim();
+  return parts
+    .map((p: any) => p?.text)
+    .filter((t: any) => typeof t === "string" && t.trim())
+    .join("\n")
+    .trim();
 }
 
 async function generateCaption(imageUrl: string, brief: string): Promise<string> {
@@ -147,9 +185,9 @@ Reglas:
         role: "user",
         content: [
           { type: "input_text", text: prompt },
-          { type: "input_image", image_url: imageUrl, detail: "auto" }
-        ]
-      }]
+          { type: "input_image", image_url: imageUrl, detail: "auto" },
+        ],
+      }],
     }),
   });
   const result = await response.json();
@@ -167,7 +205,10 @@ async function instagramRequest(url: string, body?: URLSearchParams, method = "P
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = data?.error?.error_user_msg || data?.error?.message || "Instagram rechazó la publicación.";
+    const message =
+      data?.error?.error_user_msg ||
+      data?.error?.message ||
+      "Instagram rechazó la publicación.";
     throw new Error(message);
   }
   return data;
@@ -182,24 +223,44 @@ async function publishImage(connection: any, imageUrl: string, caption: string) 
     caption: caption.slice(0, 2200),
     access_token: token,
   });
-  const created = await instagramRequest(`https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(userId)}/media`, createBody);
-  if (!created?.id) throw new Error("Instagram no devolvió el contenedor de la publicación.");
-  const containerId = String(created.id);
 
+  const created = await instagramRequest(
+    `https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(userId)}/media`,
+    createBody,
+  );
+  if (!created?.id) throw new Error("Instagram no devolvió el contenedor de la publicación.");
+
+  const containerId = String(created.id);
   let finished = false;
-  let lastStatus = "";
+
   for (let i = 0; i < 8; i++) {
-    const statusUrl = `https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(containerId)}?fields=status_code,status&access_token=${encodeURIComponent(token)}`;
+    const statusUrl =
+      `https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(containerId)}?fields=status_code,status&access_token=${encodeURIComponent(token)}`;
     const status = await instagramRequest(statusUrl, undefined, "GET");
-    lastStatus = String(status?.status_code || "");
-    if (lastStatus === "FINISHED") { finished = true; break; }
-    if (lastStatus === "ERROR" || lastStatus === "EXPIRED") throw new Error(status?.status || "Instagram no pudo procesar la foto.");
+    const code = String(status?.status_code || "");
+    if (code === "FINISHED") {
+      finished = true;
+      break;
+    }
+    if (code === "ERROR" || code === "EXPIRED") {
+      throw new Error(status?.status || "Instagram no pudo procesar la foto.");
+    }
     await new Promise((resolve) => setTimeout(resolve, 1200));
   }
-  if (!finished) throw new Error("Instagram todavía está procesando la foto. Probá Publicar otra vez en unos segundos.");
 
-  const publishBody = new URLSearchParams({ creation_id: containerId, access_token: token });
-  const published = await instagramRequest(`https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(userId)}/media_publish`, publishBody);
+  if (!finished) {
+    throw new Error("Instagram todavía está procesando la foto. Probá Publicar otra vez en unos segundos.");
+  }
+
+  const publishBody = new URLSearchParams({
+    creation_id: containerId,
+    access_token: token,
+  });
+
+  const published = await instagramRequest(
+    `https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(userId)}/media_publish`,
+    publishBody,
+  );
   if (!published?.id) throw new Error("Instagram no confirmó la publicación.");
   return String(published.id);
 }
@@ -210,7 +271,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const user = await authenticatedUser(req);
-    if (!user) return json({ error: "unauthorized", message: "Volvé a entrar a Lola con tu mail." }, 401);
+    if (!user) {
+      return json({ error: "unauthorized", message: "Volvé a entrar a Lola con tu mail." }, 401);
+    }
 
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action || "");
@@ -219,8 +282,17 @@ Deno.serve(async (req: Request) => {
       const imageUrl = String(body?.image_url || "").trim();
       const imagePath = String(body?.image_path || "").trim();
       const brief = String(body?.brief || "").trim();
-      if (!imageUrl || !imagePath) return json({ error: "missing_image", message: "Elegí una foto primero." }, 400);
-      if (!brief) return json({ error: "missing_brief", message: "Contame qué querés decir con la publicación." }, 400);
+
+      if (!imageUrl || !imagePath) {
+        return json({ error: "missing_image", message: "Elegí una foto primero." }, 400);
+      }
+      if (!brief) {
+        return json(
+          { error: "missing_brief", message: "Contame qué querés decir con la publicación." },
+          400,
+        );
+      }
+
       const caption = await generateCaption(imageUrl, brief);
       const draft = await saveDraft(user.id, { imagePath, imageUrl, brief, caption });
       return json({ ok: true, caption, draft_id: draft?.id || null });
@@ -230,20 +302,51 @@ Deno.serve(async (req: Request) => {
       const imageUrl = String(body?.image_url || "").trim();
       const caption = String(body?.caption || "").trim();
       const draftId = body?.draft_id ? String(body.draft_id) : null;
-      if (!imageUrl || !caption) return json({ error: "missing_content", message: "Falta la foto o el texto." }, 400);
+
+      if (!imageUrl || !caption) {
+        return json({ error: "missing_content", message: "Falta la foto o el texto." }, 400);
+      }
 
       const connection = await getConnection(user.id);
-      if (!connection) return json({ error: "instagram_not_connected", message: "Primero conectá tu cuenta de Instagram desde Lola." }, 409);
-      if (connection.expires_at && new Date(connection.expires_at).getTime() <= Date.now()) {
-        return json({ error: "instagram_expired", message: "La conexión de Instagram venció. Volvé a conectarla desde Lola." }, 409);
+      if (!connection) {
+        return json(
+          {
+            error: "instagram_not_connected",
+            message: "Primero habilitá un perfil de Instagram desde Lola.",
+          },
+          409,
+        );
+      }
+
+      if (
+        connection.expires_at &&
+        new Date(connection.expires_at).getTime() <= Date.now()
+      ) {
+        return json(
+          {
+            error: "instagram_expired",
+            message: "La autorización de ese perfil venció. Volvé a autorizarlo desde Lola.",
+          },
+          409,
+        );
       }
 
       try {
         const mediaId = await publishImage(connection, imageUrl, caption);
-        await markPublished(user.id, draftId, String(connection.instagram_user_id), mediaId);
-        return json({ ok: true, media_id: mediaId, username: connection.username || null });
+        await markPublished(
+          user.id,
+          draftId,
+          String(connection.instagram_user_id),
+          mediaId,
+        );
+        return json({
+          ok: true,
+          media_id: mediaId,
+          username: connection.username || null,
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "No pude publicar en Instagram.";
+        const message =
+          error instanceof Error ? error.message : "No pude publicar en Instagram.";
         await markError(user.id, draftId, message);
         return json({ error: "publish_failed", message }, 502);
       }
@@ -251,7 +354,16 @@ Deno.serve(async (req: Request) => {
 
     return json({ error: "invalid_action" }, 400);
   } catch (error) {
-    console.error("Lola Instagram compose failed:", error instanceof Error ? error.message : "unknown");
-    return json({ error: "lola_unavailable", message: error instanceof Error ? error.message : "Lola no respondió." }, 500);
+    console.error(
+      "Lola Instagram compose failed:",
+      error instanceof Error ? error.message : "unknown",
+    );
+    return json(
+      {
+        error: "lola_unavailable",
+        message: error instanceof Error ? error.message : "Lola no respondió.",
+      },
+      500,
+    );
   }
 });
