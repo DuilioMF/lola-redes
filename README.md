@@ -20,3 +20,5 @@ La configuración de la aplicación de Lola en Meta se realiza una sola vez por 
 
 La app necesita los permisos `instagram_business_basic` e `instagram_business_content_publish`. Los tokens de usuario se guardan en una tabla protegida con RLS y nunca se devuelven al navegador. Si la configuración aún no está lista, Lola muestra un aviso claro y no pide a la persona que configure Meta o Supabase.
 
+Cada mail de DoingLio mantiene su propia asociación con Instagram. Por ejemplo, un mail puede quedar vinculado a un perfil personal y otro mail a Revalsoft IA. Desde Lola, el botón **Cambiar perfil** vuelve a abrir la autorización oficial con reautenticación forzada; si la persona cancela, se conserva la conexión anterior.
+

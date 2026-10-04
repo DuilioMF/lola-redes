@@ -123,6 +123,11 @@ async function authorizeUrl(userId: string): Promise<string> {
   url.searchParams.set("redirect_uri", callback);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", SCOPES.join(","));
+  // Siempre pedimos una autenticación fresca para que una sesión previa de Instagram
+  // no ate silenciosamente Lola al perfil principal. La persona elige qué cuenta usar
+  // en la pantalla oficial de Instagram; Lola nunca ve ni guarda la contraseña.
+  url.searchParams.set("enable_fb_login", "false");
+  url.searchParams.set("force_reauth", "true");
   url.searchParams.set("state", state);
   return url.toString();
 }
