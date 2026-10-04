@@ -61,7 +61,7 @@ radial-gradient(circle at 22% 75%,#cba45d10 0,transparent 24%),
 <section class="hero"><div class="ey" id="lola-version">ESPECIALISTA DE DOINGLIO · comprobando versión</div><h1>Hola, soy <em>Lola.</em></h1><p class="lead">¿En qué puedo ayudarte? No necesitás saber de redes. Contame qué querés lograr y yo te voy guiando.</p><div class="voice">🎙 Conversación por voz · <button id="lola-greet" type="button" style="border:0;background:transparent;color:inherit;font:inherit;font-weight:800;cursor:pointer">Escuchar a Lola</button></div></section>
 <section class="channels">
 <article class="channel"><strong>Facebook</strong><br><span>● Sin conectar</span></article>
-<article class="channel" id="instagram-channel"><strong>Instagram</strong><br><span id="instagram-status">● Sin conectar</span><select id="instagram-profile-select" class="ig-profile-select" hidden aria-label="Perfil de Instagram"></select><div class="ig-actions"><button id="instagram-connect" type="button">Ya tengo Instagram</button><a id="instagram-create" class="ig-create" href="https://www.instagram.com/accounts/signup/" target="_blank" rel="noopener noreferrer">Crear cuenta de Instagram</a><button id="instagram-change" class="ig-change" type="button" hidden>Agregar cuenta</button><button id="instagram-disconnect" class="ig-disconnect" type="button" hidden>Desconectar</button></div><small id="instagram-note" class="ig-note">Si todavía no tenés cuenta, creala primero. Después volvé a Lola y elegí “Ya tengo Instagram”.</small></article>
+<article class="channel" id="instagram-channel"><strong>Instagram</strong><br><span id="instagram-status">● Sin conectar</span><select id="instagram-profile-select" class="ig-profile-select" hidden aria-label="Perfil de Instagram"></select><select id="instagram-available-select" class="ig-profile-select" hidden aria-label="Cuenta de Instagram ya autorizada"></select><div class="ig-actions"><button id="instagram-connect" type="button">Ya tengo Instagram</button><a id="instagram-create" class="ig-create" href="https://www.instagram.com/accounts/signup/" target="_blank" rel="noopener noreferrer">Crear cuenta de Instagram</a><button id="instagram-change" class="ig-change" type="button" hidden>Autorizar otra cuenta</button><button id="instagram-link-existing" class="ig-change" type="button" hidden>Usar cuenta ya autorizada</button><button id="instagram-disconnect" class="ig-disconnect" type="button" hidden>Desconectar</button></div><small id="instagram-note" class="ig-note">Si todavía no tenés cuenta, creala primero. Después volvé a Lola y elegí “Ya tengo Instagram”.</small></article>
 <article class="channel"><strong>WhatsApp</strong><br><span>● Sin conectar</span></article>
 <article class="channel"><strong>LinkedIn</strong><br><span>● Sin conectar</span></article>
 <article class="channel"><strong>TikTok</strong><br><span>● Sin conectar</span></article>
@@ -72,7 +72,7 @@ radial-gradient(circle at 22% 75%,#cba45d10 0,transparent 24%),
   <ol>
     <li>Si todavía no tenés cuenta, tocá <strong>Crear cuenta de Instagram</strong>. Registrate en Instagram y después volvé a esta pestaña.</li>
     <li>Para publicar desde Lola, tu cuenta tiene que ser profesional: <strong>Creador o Empresa</strong>. Si es personal, Instagram te permite cambiarla desde la configuración de la cuenta.</li>
-    <li>Volvé a Lola y tocá <strong>Ya tengo Instagram</strong>. Aceptá el acceso oficial. Si después querés sumar otro perfil, usá <strong>Agregar cuenta</strong>.</li>
+    <li>Volvé a Lola y tocá <strong>Ya tengo Instagram</strong>. Aceptá el acceso oficial. Si después querés sumar otro perfil, usá <strong>Autorizar otra cuenta</strong>. El permiso pertenece al perfil de Instagram, no al mail con el que entrás a Lola.</li>
     <li>Elegí una foto, contame qué querés transmitir, revisá la vista previa y tocá <strong>Publicar en Instagram</strong> cuando te guste.</li>
   </ol>
 </section>
@@ -137,6 +137,8 @@ const instagramCreate=document.getElementById('instagram-create');
 const instagramChange=document.getElementById('instagram-change');
 const instagramDisconnect=document.getElementById('instagram-disconnect');
 const instagramProfileSelect=document.getElementById('instagram-profile-select');
+const instagramAvailableSelect=document.getElementById('instagram-available-select');
+const instagramLinkExisting=document.getElementById('instagram-link-existing');
 const photoInput=document.getElementById('photo-input');
 const photoDrop=document.getElementById('photo-drop');
 const photoPreview=document.getElementById('photo-preview');
@@ -163,6 +165,19 @@ function renderInstagramProfiles(accounts){
     instagramProfileSelect.appendChild(option);
   }
   instagramProfileSelect.hidden=profiles.length<2;
+}
+function renderAvailableInstagramProfiles(accounts){
+  const profiles=Array.isArray(accounts)?accounts:[];
+  instagramAvailableSelect.innerHTML='';
+  for(const profile of profiles){
+    const option=document.createElement('option');
+    option.value=profile.instagram_user_id||'';
+    option.textContent='@'+(profile.username||'Instagram');
+    instagramAvailableSelect.appendChild(option);
+  }
+  const hasAvailable=profiles.length>0;
+  instagramAvailableSelect.hidden=!hasAvailable;
+  instagramLinkExisting.hidden=!hasAvailable;
 }
 
 function instagramMessage(message,type=''){
@@ -195,6 +210,7 @@ async function refreshInstagramStatus(){
   try{
     const data=await instagramAction('status');
     const accounts=Array.isArray(data.accounts)?data.accounts:[];
+    const availableAccounts=Array.isArray(data.available_accounts)?data.available_accounts:[];
     const active=data.active_account||accounts.find(profile=>profile.selected)||accounts[0]||null;
     const connected=accounts.length>0;
     instagramChannel.classList.toggle('connected',connected);
@@ -206,11 +222,12 @@ async function refreshInstagramStatus(){
     instagramDisconnect.hidden=!connected;
     instagramConnect.disabled=false;
     renderInstagramProfiles(accounts);
+    renderAvailableInstagramProfiles(availableAccounts);
     if(connected){
       instagramMessage(
         accounts.length>1
-          ? 'Tenés '+accounts.length+' cuentas conectadas. Elegí arriba cuál querés usar; publicar va a salir por ese perfil.'
-          : 'Está conectada @'+(active?.username||'Instagram')+'. Si querés sumar otro perfil, tocá “Agregar cuenta”.',
+          ? 'Tenés '+accounts.length+' perfiles habilitados. Elegí arriba cuál querés usar; publicar va a salir por ese perfil.'
+          : 'Está habilitado @'+(active?.username||'Instagram')+'. Si querés sumar otro perfil, tocá “Autorizar otra cuenta”.',
         'ok'
       );
     }else{
@@ -227,7 +244,8 @@ function showInstagramReturn(){
   if(!result)return;
   url.searchParams.delete('instagram');
   history.replaceState({},document.title,url.pathname+url.search);
-  if(result==='connected')instagramMessage('Instagram quedó conectado.','ok');
+  if(result==='connected')instagramMessage('El perfil de Instagram quedó autorizado y habilitado en Lola.','ok');
+  else if(result==='same_account')instagramMessage('Instagram devolvió el mismo perfil que ya estaba autorizado. No se agregó una cuenta nueva.','error');
   else if(result==='cancelled')instagramMessage('Cancelaste la conexión. No se hicieron cambios.','');
   else instagramMessage('No se pudo completar la conexión. Volvé a intentar desde Lola; si sigue pasando, te ayudo a resolverlo.','error');
 }
@@ -486,12 +504,28 @@ instagramProfileSelect.addEventListener('change',async()=>{
   }
 });
 
+instagramLinkExisting.addEventListener('click',async()=>{
+  const id=instagramAvailableSelect.value;
+  if(!id)return;
+  instagramLinkExisting.disabled=true;
+  try{
+    const data=await instagramAction('link',{instagram_user_id:id});
+    const active=data.active_account||null;
+    instagramMessage('Cuenta habilitada en Lola: @'+(active?.username||'Instagram')+'. No hizo falta pedir otro permiso a Meta.','ok');
+    await refreshInstagramStatus();
+  }catch(error){
+    instagramMessage(error.message||'No pude habilitar esa cuenta.','error');
+  }finally{
+    instagramLinkExisting.disabled=false;
+  }
+});
+
 instagramCreate.addEventListener('click',()=>{
   instagramMessage('Instagram se abre en otra pestaña. Creá tu cuenta y, cuando termines, volvé a Lola: te guío para conectarla.');
 });
 instagramConnect.addEventListener('click',async()=>{
   instagramConnect.disabled=true;
-  instagramMessage('Abriendo Instagram. Elegí el perfil que querés usar con este mail…');
+  instagramMessage('Abriendo Instagram para autorizar el perfil. El permiso queda ligado a Instagram, no a tu mail de Lola.');
   try{
     const data=await instagramAction('start');
     if(!data.authorize_url)throw new Error('Meta no devolvió el enlace de autorización.');
@@ -503,7 +537,7 @@ instagramConnect.addEventListener('click',async()=>{
 });
 instagramChange.addEventListener('click',async()=>{
   instagramChange.disabled=true;
-  instagramMessage('Abriendo la autorización oficial para agregar otra cuenta. Las cuentas que ya conectaste se conservan.');
+  instagramMessage('Abriendo la autorización oficial para otro perfil de Instagram. Si Meta devuelve el mismo perfil, Lola no lo duplicará.');
   try{
     const data=await instagramAction('add');
     if(!data.authorize_url)throw new Error('Meta no devolvió el enlace de autorización.');
