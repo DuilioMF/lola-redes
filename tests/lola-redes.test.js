@@ -69,30 +69,30 @@ test('Crear cuenta de Instagram abre un enlace normal en otra pestaña',()=>{
 });
 
 
-test('L6 permite cambiar de perfil de Instagram sin heredar la sesión principal',()=>{
+test('L9 guarda varias cuentas de Instagram y selecciona una activa sin mover la conexión anterior',()=>{
   const backend=fs.readFileSync('supabase/functions/lola-instagram-oauth/index.ts','utf8');
-  assert.match(html,/id="instagram-change"/);
-  assert.match(html,/Cambiar perfil/);
-  assert.match(html,/La conexión actual se conserva si cancelás/);
-  assert.ok(backend.includes('url.searchParams.set("force_reauth", "true")'));
-  assert.ok(backend.includes('url.searchParams.set("enable_fb_login", "0")'));
-});
+  const composer=fs.readFileSync('supabase/functions/lola-instagram-compose/index.ts','utf8');
+  const migration=fs.readFileSync('supabase/migrations/202610040001_lola_instagram_multicuenta.sql','utf8');
 
-
-test('L7 fuerza autenticacion real al cambiar de cuenta Instagram',()=>{
-  const backend=fs.readFileSync('supabase/functions/lola-instagram-oauth/index.ts','utf8');
-  assert.ok(backend.includes('body.action === "start" || body.action === "switch"'));
-  assert.ok(backend.includes('url.searchParams.set("force_authentication", "1")'));
-  assert.ok(backend.includes('url.searchParams.set("enable_fb_login", "0")'));
-  assert.ok(html.includes("instagramAction('switch')"));
-});
-
-
-test('L8 usa Lola Local para multiples perfiles de Instagram',()=>{
   assert.match(html,/id="instagram-profile-select"/);
-  assert.match(html,/LOLA_LOCAL_URL='http:\/\/127\.0\.0\.1:8791'/);
-  assert.match(html,/localInstagramHealth/);
-  assert.match(html,/\/publish-image/);
-  assert.match(html,/\/select/);
-  assert.match(html,/Lola Local/);
+  assert.match(html,/Agregar cuenta/);
+  assert.ok(html.includes("instagramAction('select'"));
+  assert.ok(html.includes("instagramAction('add'"));
+  assert.doesNotMatch(html,/LOLA_LOCAL_URL|localInstagramHealth|Lola Local|127\.0\.0\.1:8791/);
+
+  assert.ok(backend.includes('lola_instagram_accounts'));
+  assert.ok(backend.includes('lola_instagram_connections'));
+  assert.ok(backend.includes('lola_instagram_profile_selection'));
+  assert.ok(backend.includes('active_account'));
+  assert.ok(backend.includes('body.action === "select"'));
+  assert.ok(backend.includes('on_conflict=user_id,instagram_user_id'));
+
+  assert.ok(composer.includes('lola_instagram_accounts'));
+  assert.ok(composer.includes('lola_instagram_connections'));
+  assert.ok(composer.includes('lola_instagram_profile_selection'));
+  assert.ok(composer.includes('getSelectedInstagramUserId'));
+
+  assert.ok(migration.includes('lola_instagram_accounts'));
+  assert.ok(migration.includes('lola_instagram_profile_selection'));
+  assert.doesNotMatch(migration,/insert\s+into\s+public\.lola_instagram_accounts[\s\S]*from\s+public\.lola_instagram_connections/i);
 });

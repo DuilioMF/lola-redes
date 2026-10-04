@@ -61,7 +61,7 @@ radial-gradient(circle at 22% 75%,#cba45d10 0,transparent 24%),
 <section class="hero"><div class="ey" id="lola-version">ESPECIALISTA DE DOINGLIO · comprobando versión</div><h1>Hola, soy <em>Lola.</em></h1><p class="lead">¿En qué puedo ayudarte? No necesitás saber de redes. Contame qué querés lograr y yo te voy guiando.</p><div class="voice">🎙 Conversación por voz · <button id="lola-greet" type="button" style="border:0;background:transparent;color:inherit;font:inherit;font-weight:800;cursor:pointer">Escuchar a Lola</button></div></section>
 <section class="channels">
 <article class="channel"><strong>Facebook</strong><br><span>● Sin conectar</span></article>
-<article class="channel" id="instagram-channel"><strong>Instagram</strong><br><span id="instagram-status">● Sin conectar</span><select id="instagram-profile-select" class="ig-profile-select" hidden aria-label="Perfil de Instagram"></select><div class="ig-actions"><button id="instagram-connect" type="button">Ya tengo Instagram</button><a id="instagram-create" class="ig-create" href="https://www.instagram.com/accounts/signup/" target="_blank" rel="noopener noreferrer">Crear cuenta de Instagram</a><button id="instagram-change" class="ig-change" type="button" hidden>Cambiar perfil</button><button id="instagram-disconnect" class="ig-disconnect" type="button" hidden>Desconectar</button></div><small id="instagram-note" class="ig-note">Si todavía no tenés cuenta, creala primero. Después volvé a Lola y elegí “Ya tengo Instagram”.</small></article>
+<article class="channel" id="instagram-channel"><strong>Instagram</strong><br><span id="instagram-status">● Sin conectar</span><select id="instagram-profile-select" class="ig-profile-select" hidden aria-label="Perfil de Instagram"></select><div class="ig-actions"><button id="instagram-connect" type="button">Ya tengo Instagram</button><a id="instagram-create" class="ig-create" href="https://www.instagram.com/accounts/signup/" target="_blank" rel="noopener noreferrer">Crear cuenta de Instagram</a><button id="instagram-change" class="ig-change" type="button" hidden>Agregar cuenta</button><button id="instagram-disconnect" class="ig-disconnect" type="button" hidden>Desconectar</button></div><small id="instagram-note" class="ig-note">Si todavía no tenés cuenta, creala primero. Después volvé a Lola y elegí “Ya tengo Instagram”.</small></article>
 <article class="channel"><strong>WhatsApp</strong><br><span>● Sin conectar</span></article>
 <article class="channel"><strong>LinkedIn</strong><br><span>● Sin conectar</span></article>
 <article class="channel"><strong>TikTok</strong><br><span>● Sin conectar</span></article>
@@ -72,7 +72,7 @@ radial-gradient(circle at 22% 75%,#cba45d10 0,transparent 24%),
   <ol>
     <li>Si todavía no tenés cuenta, tocá <strong>Crear cuenta de Instagram</strong>. Registrate en Instagram y después volvé a esta pestaña.</li>
     <li>Para publicar desde Lola, tu cuenta tiene que ser profesional: <strong>Creador o Empresa</strong>. Si es personal, Instagram te permite cambiarla desde la configuración de la cuenta.</li>
-    <li>Volvé a Lola y tocá <strong>Ya tengo Instagram</strong>. Aceptá el acceso oficial y volverás acá con la cuenta conectada.</li>
+    <li>Volvé a Lola y tocá <strong>Ya tengo Instagram</strong>. Aceptá el acceso oficial. Si después querés sumar otro perfil, usá <strong>Agregar cuenta</strong>.</li>
     <li>Elegí una foto, contame qué querés transmitir, revisá la vista previa y tocá <strong>Publicar en Instagram</strong> cuando te guste.</li>
   </ol>
 </section>
@@ -137,7 +137,6 @@ const instagramCreate=document.getElementById('instagram-create');
 const instagramChange=document.getElementById('instagram-change');
 const instagramDisconnect=document.getElementById('instagram-disconnect');
 const instagramProfileSelect=document.getElementById('instagram-profile-select');
-const LOLA_LOCAL_URL='http://127.0.0.1:8791';
 const photoInput=document.getElementById('photo-input');
 const photoDrop=document.getElementById('photo-drop');
 const photoPreview=document.getElementById('photo-preview');
@@ -152,26 +151,9 @@ let selectedPhotoFile=null;
 let currentImagePath='';
 let currentImageUrl='';
 let currentDraftId=null;
-let localInstagram=null;
 
-async function localInstagramRequest(path,options={}){
-  const response=await fetch(LOLA_LOCAL_URL+path,{cache:'no-store',...options});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok||data?.ok===false)throw new Error(data?.error||'Lola Local no respondió.');
-  return data;
-}
-async function localInstagramHealth(){
-  try{
-    const data=await localInstagramRequest('/health');
-    localInstagram=data?.connector==='LolaInstagramLocal'?data:null;
-    return localInstagram;
-  }catch(_){
-    localInstagram=null;
-    return null;
-  }
-}
-function renderLocalProfiles(data){
-  const profiles=Array.isArray(data?.profiles)?data.profiles:[];
+function renderInstagramProfiles(accounts){
+  const profiles=Array.isArray(accounts)?accounts:[];
   instagramProfileSelect.innerHTML='';
   for(const profile of profiles){
     const option=document.createElement('option');
@@ -181,7 +163,6 @@ function renderLocalProfiles(data){
     instagramProfileSelect.appendChild(option);
   }
   instagramProfileSelect.hidden=profiles.length<2;
-  instagramChange.hidden=profiles.length>1?true:instagramChange.hidden;
 }
 
 function instagramMessage(message,type=''){
@@ -193,8 +174,8 @@ function instagramErrorMessage(code,message,fallback){
   if(code==='instagram_not_configured'||/Falta configurar (META_APP_ID|META_APP_SECRET)/i.test(message||''))return INSTAGRAM_SETUP_PENDING;
   return message||fallback;
 }
-async function instagramAction(action){
-  const {data,error}=await sb.functions.invoke('lola-instagram-oauth',{body:{action}});
+async function instagramAction(action,payload={}){
+  const {data,error}=await sb.functions.invoke('lola-instagram-oauth',{body:{action,...payload}});
   if(error){
     let message=data?.message||'';
     let code=data?.error||'';
@@ -211,34 +192,30 @@ async function instagramAction(action){
 async function refreshInstagramStatus(){
   if(!document.body.classList.contains('authenticated'))return;
   instagramConnect.disabled=true;
-  const local=await localInstagramHealth();
-  if(local&&Array.isArray(local.profiles)&&local.profiles.length){
-    const username=local.username||local.profiles.find(p=>p.selected)?.username||local.profiles[0]?.username||'Instagram';
-    instagramChannel.classList.add('connected');
-    instagramStatus.textContent='● Lola Local · @'+username;
-    previewUser.textContent='@'+username;
-    instagramConnect.hidden=true;
-    instagramCreate.hidden=true;
-    instagramDisconnect.hidden=true;
-    instagramChange.hidden=true;
-    instagramConnect.disabled=false;
-    renderLocalProfiles(local);
-    instagramMessage(local.profiles.length>1?'Elegí acá qué perfil querés usar. Lola publica contra el ID/token de ese perfil, no contra la sesión abierta de Instagram.':'Perfil local listo: @'+username+'. Podés agregar más perfiles al conector.','ok');
-    return;
-  }
-  instagramProfileSelect.hidden=true;
   try{
     const data=await instagramAction('status');
-    const connected=!!data.connected;
+    const accounts=Array.isArray(data.accounts)?data.accounts:[];
+    const active=data.active_account||accounts.find(profile=>profile.selected)||accounts[0]||null;
+    const connected=accounts.length>0;
     instagramChannel.classList.toggle('connected',connected);
-    instagramStatus.textContent=connected?'● Conectada como @'+(data.account?.username||'Instagram'):'● Sin conectar';
-    previewUser.textContent=connected?'@'+(data.account?.username||'instagram'):'@tu_instagram';
+    instagramStatus.textContent=connected?'● Conectada como @'+(active?.username||'Instagram'):'● Sin conectar';
+    previewUser.textContent=connected?'@'+(active?.username||'instagram'):'@tu_instagram';
     instagramConnect.hidden=connected;
     instagramCreate.hidden=connected;
     instagramChange.hidden=!connected;
     instagramDisconnect.hidden=!connected;
     instagramConnect.disabled=false;
-    instagramMessage(connected?'Este mail de DoingLio está vinculado a @'+(data.account?.username||'Instagram')+'. Si Lola Local está instalado, el selector aparece automáticamente.':'¿No tenés Instagram? Creá la cuenta primero. Cuando termines, volvé acá y conectala.',connected?'ok':'');
+    renderInstagramProfiles(accounts);
+    if(connected){
+      instagramMessage(
+        accounts.length>1
+          ? 'Tenés '+accounts.length+' cuentas conectadas. Elegí arriba cuál querés usar; publicar va a salir por ese perfil.'
+          : 'Está conectada @'+(active?.username||'Instagram')+'. Si querés sumar otro perfil, tocá “Agregar cuenta”.',
+        'ok'
+      );
+    }else{
+      instagramMessage('¿No tenés Instagram? Creá la cuenta primero. Cuando termines, volvé acá y conectala.');
+    }
   }catch(error){
     instagramConnect.disabled=false;
     instagramMessage(error.message||'No se pudo consultar el estado de Instagram.','error');
@@ -474,10 +451,11 @@ postPublish.addEventListener('click',async()=>{
   postPublish.disabled=true; postGenerate.disabled=true;
   composeMessage('Publicando en Instagram…');
   try{
-    const local=await localInstagramHealth();
-    const data=local&&Array.isArray(local.profiles)&&local.profiles.length
-      ? await localInstagramRequest('/publish-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_url:currentImageUrl,caption:postCaption.value.trim()})})
-      : await composerAction('publish',{image_url:currentImageUrl,caption:postCaption.value.trim(),draft_id:currentDraftId});
+    const data=await composerAction('publish',{
+      image_url:currentImageUrl,
+      caption:postCaption.value.trim(),
+      draft_id:currentDraftId
+    });
     composeMessage('Publicado en Instagram'+(data.username?' como @'+data.username:'')+'.','ok');
   }catch(error){
     const message=error.message||'No pude publicar.';
@@ -494,13 +472,15 @@ instagramProfileSelect.addEventListener('change',async()=>{
   if(!id)return;
   instagramProfileSelect.disabled=true;
   try{
-    const data=await localInstagramRequest('/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instagram_user_id:id})});
-    instagramStatus.textContent='● Lola Local · @'+(data.username||'Instagram');
-    previewUser.textContent='@'+(data.username||'instagram');
-    instagramMessage('Perfil activo cambiado a @'+(data.username||'Instagram')+'.','ok');
-    await refreshInstagramStatus();
+    const data=await instagramAction('select',{instagram_user_id:id});
+    const active=data.active_account||null;
+    instagramStatus.textContent='● Conectada como @'+(active?.username||'Instagram');
+    previewUser.textContent='@'+(active?.username||'instagram');
+    instagramMessage('Perfil activo cambiado a @'+(active?.username||'Instagram')+'. Todo lo que publiques ahora sale por esa cuenta.','ok');
+    renderInstagramProfiles(data.accounts||[]);
   }catch(error){
-    instagramMessage(error.message||'No pude cambiar el perfil local.','error');
+    instagramMessage(error.message||'No pude cambiar el perfil.','error');
+    await refreshInstagramStatus();
   }finally{
     instagramProfileSelect.disabled=false;
   }
@@ -523,9 +503,9 @@ instagramConnect.addEventListener('click',async()=>{
 });
 instagramChange.addEventListener('click',async()=>{
   instagramChange.disabled=true;
-  instagramMessage('Abriendo Instagram para identificarte de nuevo y elegir otra cuenta. La conexión actual se conserva si cancelás.');
+  instagramMessage('Abriendo la autorización oficial para agregar otra cuenta. Las cuentas que ya conectaste se conservan.');
   try{
-    const data=await instagramAction('switch');
+    const data=await instagramAction('add');
     if(!data.authorize_url)throw new Error('Meta no devolvió el enlace de autorización.');
     location.assign(data.authorize_url);
   }catch(error){
@@ -536,19 +516,15 @@ instagramChange.addEventListener('click',async()=>{
 instagramDisconnect.addEventListener('click',async()=>{
   instagramDisconnect.disabled=true;
   try{
-    await instagramAction('disconnect');
-    instagramChannel.classList.remove('connected');
-    instagramStatus.textContent='● Sin conectar';
-    instagramDisconnect.hidden=true;
-    instagramDisconnect.disabled=false;
-    instagramChange.hidden=true;
-    instagramChange.disabled=false;
-    instagramConnect.hidden=false;
-    instagramCreate.hidden=false;
-    instagramMessage('Instagram se desconectó.','');
+    const activeId=instagramProfileSelect.value||undefined;
+    await instagramAction('disconnect',activeId?{instagram_user_id:activeId}:{});
+    instagramMessage('La cuenta seleccionada se desconectó.','');
+    await refreshInstagramStatus();
   }catch(error){
-    instagramDisconnect.disabled=false;
     instagramMessage(error.message||'No se pudo desconectar Instagram.','error');
+  }finally{
+    instagramDisconnect.disabled=false;
+    instagramChange.disabled=false;
   }
 });
 showInstagramReturn();
