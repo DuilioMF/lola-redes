@@ -89,63 +89,87 @@ function adminHeaders(): HeadersInit {
   return { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json" };
 }
 
-function tableUrl(query = ""): string {
-  return secret("SUPABASE_URL") + "/rest/v1/lola_instagram_accounts" + query;
+function restTable(table: string, query = ""): string {
+  return secret("SUPABASE_URL") + "/rest/v1/" + table + query;
+}
+
+async function getSelection(userId: string): Promise<string | null> {
+  const response = await fetch(restTable(
+    "lola_instagram_profile_selection",
+    "?select=instagram_user_id&user_id=eq." + encodeURIComponent(userId) + "&limit=1"
+  ), { headers: adminHeaders() });
+  if (!response.ok) throw new Error("No se pudo consultar el perfil activo.");
+  const rows = await response.json();
+  return Array.isArray(rows) && rows.length ? String(rows[0].instagram_user_id || "") || null : null;
+}
+
+async function setSelection(userId: string, instagramUserId: string): Promise<void> {
+  const response = await fetch(restTable("lola_instagram_profile_selection", "?on_conflict=user_id"), {
+    method: "POST",
+    headers: { ...adminHeaders(), Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({
+      user_id: userId,
+      instagram_user_id: instagramUserId,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+  if (!response.ok) throw new Error("No se pudo guardar el perfil activo.");
+}
+
+async function clearSelection(userId: string): Promise<void> {
+  await fetch(restTable(
+    "lola_instagram_profile_selection",
+    "?user_id=eq." + encodeURIComponent(userId)
+  ), { method: "DELETE", headers: adminHeaders() });
+}
+
+async function fetchAccountMetadata(table: string, userId: string): Promise<PublicAccount[]> {
+  const response = await fetch(restTable(
+    table,
+    "?select=instagram_user_id,username,expires_at,connected_at&user_id=eq." +
+      encodeURIComponent(userId) + "&order=connected_at.asc"
+  ), { headers: adminHeaders() });
+  if (!response.ok) throw new Error("No se pudo consultar el estado de Instagram.");
+  const rows = await response.json();
+  return Array.isArray(rows) ? rows.map((row) => ({
+    instagram_user_id: String(row.instagram_user_id || ""),
+    username: String(row.username || "Instagram"),
+    expires_at: row.expires_at || null,
+    connected_at: row.connected_at || new Date(0).toISOString(),
+    selected: false,
+  })).filter((row) => row.instagram_user_id) : [];
 }
 
 async function listAccounts(userId: string): Promise<PublicAccount[]> {
-  const query = "?select=instagram_user_id,username,expires_at,connected_at,selected&user_id=eq." +
-    encodeURIComponent(userId) + "&order=selected.desc,connected_at.asc";
-  const response = await fetch(tableUrl(query), { headers: adminHeaders() });
-  if (!response.ok) throw new Error("No se pudo consultar el estado de Instagram.");
-  const rows = await response.json();
-  return Array.isArray(rows) ? rows : [];
-}
+  const [modern, legacy] = await Promise.all([
+    fetchAccountMetadata("lola_instagram_accounts", userId),
+    fetchAccountMetadata("lola_instagram_connections", userId),
+  ]);
+  const byId = new Map<string, PublicAccount>();
+  for (const account of modern) byId.set(account.instagram_user_id, account);
+  for (const account of legacy) if (!byId.has(account.instagram_user_id)) byId.set(account.instagram_user_id, account);
 
-async function deselectAll(userId: string): Promise<void> {
-  const response = await fetch(tableUrl("?user_id=eq." + encodeURIComponent(userId)), {
-    method: "PATCH",
-    headers: { ...adminHeaders(), Prefer: "return=minimal" },
-    body: JSON.stringify({ selected: false, updated_at: new Date().toISOString() }),
-  });
-  if (!response.ok) throw new Error("No se pudo cambiar el perfil activo.");
+  const accounts = [...byId.values()];
+  let selectedId = await getSelection(userId);
+  if (selectedId && !byId.has(selectedId)) selectedId = null;
+  if (!selectedId && accounts.length) {
+    selectedId = accounts[0].instagram_user_id;
+    await setSelection(userId, selectedId);
+  }
+  return accounts.map((account) => ({ ...account, selected: account.instagram_user_id === selectedId }));
 }
 
 async function selectAccount(userId: string, instagramUserId: string): Promise<PublicAccount> {
-  const lookup = await fetch(tableUrl(
-    "?select=instagram_user_id,username,expires_at,connected_at,selected&user_id=eq." +
-    encodeURIComponent(userId) + "&instagram_user_id=eq." + encodeURIComponent(instagramUserId) + "&limit=1"
-  ), { headers: adminHeaders() });
-  if (!lookup.ok) throw new Error("No se pudo consultar el perfil.");
-  const rows = await lookup.json();
-  if (!Array.isArray(rows) || !rows.length) throw new Error("Ese perfil no pertenece a tu cuenta de Lola.");
-
-  await deselectAll(userId);
-  const response = await fetch(tableUrl(
-    "?user_id=eq." + encodeURIComponent(userId) +
-    "&instagram_user_id=eq." + encodeURIComponent(instagramUserId)
-  ), {
-    method: "PATCH",
-    headers: { ...adminHeaders(), Prefer: "return=minimal" },
-    body: JSON.stringify({ selected: true, updated_at: new Date().toISOString() }),
-  });
-  if (!response.ok) throw new Error("No se pudo seleccionar el perfil.");
-  return { ...rows[0], selected: true };
-}
-
-async function ensureSelected(userId: string): Promise<PublicAccount[]> {
-  let accounts = await listAccounts(userId);
-  if (accounts.length && !accounts.some((account) => account.selected)) {
-    await selectAccount(userId, accounts[0].instagram_user_id);
-    accounts = await listAccounts(userId);
-  }
-  return accounts;
+  const accounts = await listAccounts(userId);
+  const target = accounts.find((account) => account.instagram_user_id === instagramUserId);
+  if (!target) throw new Error("Ese perfil no pertenece a tu cuenta de Lola.");
+  await setSelection(userId, instagramUserId);
+  return { ...target, selected: true };
 }
 
 async function saveConnection(userId: string, token: string, profile: { user_id: string; username: string }, expiresIn: number): Promise<void> {
   const now = new Date();
-  await deselectAll(userId);
-  const response = await fetch(tableUrl("?on_conflict=user_id,instagram_user_id"), {
+  const response = await fetch(restTable("lola_instagram_accounts", "?on_conflict=user_id,instagram_user_id"), {
     method: "POST",
     headers: { ...adminHeaders(), Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify({
@@ -155,29 +179,31 @@ async function saveConnection(userId: string, token: string, profile: { user_id:
       access_token: token,
       expires_at: expiresIn > 0 ? new Date(now.getTime() + expiresIn * 1000).toISOString() : null,
       granted_scopes: SCOPES,
-      selected: true,
+      selected: false,
       source: "oauth",
       connected_at: now.toISOString(),
       updated_at: now.toISOString(),
     }),
   });
   if (!response.ok) throw new Error("No se pudo guardar la conexión de Instagram.");
+  await setSelection(userId, profile.user_id);
 }
 
 async function removeConnection(userId: string, instagramUserId?: string): Promise<PublicAccount[]> {
-  let target = instagramUserId || "";
-  if (!target) {
-    const accounts = await ensureSelected(userId);
-    target = accounts.find((account) => account.selected)?.instagram_user_id || "";
-  }
+  const accounts = await listAccounts(userId);
+  const target = instagramUserId || accounts.find((account) => account.selected)?.instagram_user_id || "";
   if (target) {
-    const response = await fetch(tableUrl(
-      "?user_id=eq." + encodeURIComponent(userId) +
-      "&instagram_user_id=eq." + encodeURIComponent(target)
-    ), { method: "DELETE", headers: adminHeaders() });
-    if (!response.ok) throw new Error("No se pudo desconectar Instagram.");
+    for (const table of ["lola_instagram_accounts", "lola_instagram_connections"]) {
+      const response = await fetch(restTable(
+        table,
+        "?user_id=eq." + encodeURIComponent(userId) +
+        "&instagram_user_id=eq." + encodeURIComponent(target)
+      ), { method: "DELETE", headers: adminHeaders() });
+      if (!response.ok) throw new Error("No se pudo desconectar Instagram.");
+    }
   }
-  return await ensureSelected(userId);
+  await clearSelection(userId);
+  return await listAccounts(userId);
 }
 
 async function authorizeUrl(userId: string): Promise<string> {
@@ -271,7 +297,7 @@ Deno.serve(async (request: Request) => {
     }
 
     if (body.action === "status") {
-      const accounts = await ensureSelected(user.id);
+      const accounts = await listAccounts(user.id);
       const activeAccount = accounts.find((account) => account.selected) || null;
       return json({ connected: accounts.length > 0, accounts, active_account: activeAccount });
     }
