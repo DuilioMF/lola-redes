@@ -67,3 +67,13 @@ test('Crear cuenta de Instagram abre un enlace normal en otra pestaña',()=>{
   assert.match(html,/<a id="instagram-create" class="ig-create" href="https:\/\/www\.instagram\.com\/accounts\/signup\/" target="_blank" rel="noopener noreferrer">/);
   assert.doesNotMatch(html,/window\.open\('https:\/\/www\.instagram\.com\/accounts\/signup\//);
 });
+
+
+test('L6 permite cambiar de perfil de Instagram sin heredar la sesión principal',()=>{
+  const backend=fs.readFileSync('supabase/functions/lola-instagram-oauth/index.ts','utf8');
+  assert.match(html,/id="instagram-change"/);
+  assert.match(html,/Cambiar perfil/);
+  assert.match(html,/La conexión actual se conserva si cancelás/);
+  assert.ok(backend.includes('url.searchParams.set("force_reauth", "true")'));
+  assert.ok(backend.includes('url.searchParams.set("enable_fb_login", "false")'));
+});
