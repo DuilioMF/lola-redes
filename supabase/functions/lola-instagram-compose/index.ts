@@ -38,21 +38,39 @@ function adminHeaders(): HeadersInit {
   return { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json" };
 }
 
-async function getConnection(userId: string): Promise<any | null> {
-  const base = secret("SUPABASE_URL") + "/rest/v1/lola_instagram_accounts";
-  const selectedUrl = base + "?select=instagram_user_id,username,access_token,expires_at,selected&user_id=eq." +
-    encodeURIComponent(userId) + "&selected=eq.true&limit=1";
-  let response = await fetch(selectedUrl, { headers: adminHeaders() });
+async function fetchConnection(table: string, userId: string, instagramUserId?: string): Promise<any | null> {
+  let query = "?select=instagram_user_id,username,access_token,expires_at&user_id=eq." + encodeURIComponent(userId);
+  if (instagramUserId) query += "&instagram_user_id=eq." + encodeURIComponent(instagramUserId);
+  query += "&order=connected_at.asc&limit=1";
+  const response = await fetch(secret("SUPABASE_URL") + "/rest/v1/" + table + query, { headers: adminHeaders() });
   if (!response.ok) throw new Error("No pude consultar la conexión de Instagram.");
-  let rows = await response.json();
-  if (Array.isArray(rows) && rows.length) return rows[0];
-
-  const fallbackUrl = base + "?select=instagram_user_id,username,access_token,expires_at,selected&user_id=eq." +
-    encodeURIComponent(userId) + "&order=connected_at.asc&limit=1";
-  response = await fetch(fallbackUrl, { headers: adminHeaders() });
-  if (!response.ok) throw new Error("No pude consultar la conexión de Instagram.");
-  rows = await response.json();
+  const rows = await response.json();
   return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
+async function getSelectedInstagramUserId(userId: string): Promise<string | null> {
+  const response = await fetch(
+    secret("SUPABASE_URL") + "/rest/v1/lola_instagram_profile_selection" +
+      "?select=instagram_user_id&user_id=eq." + encodeURIComponent(userId) + "&limit=1",
+    { headers: adminHeaders() }
+  );
+  if (!response.ok) throw new Error("No pude consultar el perfil activo de Instagram.");
+  const rows = await response.json();
+  return Array.isArray(rows) && rows.length ? String(rows[0].instagram_user_id || "") || null : null;
+}
+
+async function getConnection(userId: string): Promise<any | null> {
+  const selectedId = await getSelectedInstagramUserId(userId);
+  if (selectedId) {
+    const modern = await fetchConnection("lola_instagram_accounts", userId, selectedId);
+    if (modern) return modern;
+    const legacy = await fetchConnection("lola_instagram_connections", userId, selectedId);
+    if (legacy) return legacy;
+  }
+
+  const modernFallback = await fetchConnection("lola_instagram_accounts", userId);
+  if (modernFallback) return modernFallback;
+  return await fetchConnection("lola_instagram_connections", userId);
 }
 
 async function saveDraft(userId: string, payload: { imagePath: string; imageUrl: string; brief: string; caption: string }) {
