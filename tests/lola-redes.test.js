@@ -86,3 +86,13 @@ test('L7 fuerza autenticacion real al cambiar de cuenta Instagram',()=>{
   assert.ok(backend.includes('url.searchParams.set("enable_fb_login", "0")'));
   assert.ok(html.includes("instagramAction('switch')"));
 });
+
+
+test('L8 usa Lola Local para multiples perfiles de Instagram',()=>{
+  assert.match(html,/id="instagram-profile-select"/);
+  assert.match(html,/LOLA_LOCAL_URL='http:\/\/127\.0\.0\.1:8791'/);
+  assert.match(html,/localInstagramHealth/);
+  assert.match(html,/\/publish-image/);
+  assert.match(html,/\/select/);
+  assert.match(html,/Lola Local/);
+});
