@@ -454,9 +454,9 @@ instagramConnect.addEventListener('click',async()=>{
 });
 instagramChange.addEventListener('click',async()=>{
   instagramChange.disabled=true;
-  instagramMessage('Abriendo Instagram para elegir otro perfil. La conexión actual se conserva si cancelás.');
+  instagramMessage('Abriendo Instagram para identificarte de nuevo y elegir otra cuenta. La conexión actual se conserva si cancelás.');
   try{
-    const data=await instagramAction('start');
+    const data=await instagramAction('switch');
     if(!data.authorize_url)throw new Error('Meta no devolvió el enlace de autorización.');
     location.assign(data.authorize_url);
   }catch(error){

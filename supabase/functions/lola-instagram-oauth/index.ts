@@ -37,10 +37,12 @@ function base64url(bytes: Uint8Array): string {
   return btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
-function fromBase64url(value: string): Uint8Array {
+function fromBase64url(value: string): ArrayBuffer {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(normalized + "=".repeat((4 - normalized.length % 4) % 4));
-  return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes.buffer;
 }
 
 async function signState(payload: InstagramState, signingKey: string): Promise<string> {
@@ -126,8 +128,9 @@ async function authorizeUrl(userId: string): Promise<string> {
   // Siempre pedimos una autenticación fresca para que una sesión previa de Instagram
   // no ate silenciosamente Lola al perfil principal. La persona elige qué cuenta usar
   // en la pantalla oficial de Instagram; Lola nunca ve ni guarda la contraseña.
-  url.searchParams.set("enable_fb_login", "false");
+  url.searchParams.set("enable_fb_login", "0");
   url.searchParams.set("force_reauth", "true");
+  url.searchParams.set("force_authentication", "1");
   url.searchParams.set("state", state);
   return url.toString();
 }
@@ -197,7 +200,7 @@ Deno.serve(async (request: Request) => {
     const user = await authenticatedUser(request);
     if (!user) return json({ error: "unauthorized", message: "Volvé a entrar a Lola con tu mail." }, 401);
     const body = await request.json().catch(() => ({}));
-    if (body.action === "start") {
+    if (body.action === "start" || body.action === "switch") {
       try { return json({ authorize_url: await authorizeUrl(user.id) }); }
       catch (error) {
         return json({ error: "instagram_not_configured", message: error instanceof Error ? error.message : "Falta configurar Instagram." }, 503);
