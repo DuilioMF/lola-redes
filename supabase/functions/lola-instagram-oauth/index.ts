@@ -37,10 +37,12 @@ function base64url(bytes: Uint8Array): string {
   return btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
-function fromBase64url(value: string): Uint8Array {
+function fromBase64url(value: string): ArrayBuffer {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(normalized + "=".repeat((4 - normalized.length % 4) % 4));
-  return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes.buffer;
 }
 
 async function signState(payload: InstagramState, signingKey: string): Promise<string> {
