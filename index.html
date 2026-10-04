@@ -61,7 +61,7 @@ radial-gradient(circle at 22% 75%,#cba45d10 0,transparent 24%),
 <section class="hero"><div class="ey" id="lola-version">ESPECIALISTA DE DOINGLIO · comprobando versión</div><h1>Hola, soy <em>Lola.</em></h1><p class="lead">¿En qué puedo ayudarte? No necesitás saber de redes. Contame qué querés lograr y yo te voy guiando.</p><div class="voice">🎙 Conversación por voz · <button id="lola-greet" type="button" style="border:0;background:transparent;color:inherit;font:inherit;font-weight:800;cursor:pointer">Escuchar a Lola</button></div></section>
 <section class="channels">
 <article class="channel"><strong>Facebook</strong><br><span>● Sin conectar</span></article>
-<article class="channel" id="instagram-channel"><strong>Instagram</strong><br><span id="instagram-status">● Sin conectar</span><div class="ig-actions"><button id="instagram-connect" type="button">Ya tengo Instagram</button><a id="instagram-create" class="ig-create" href="https://www.instagram.com/accounts/signup/" target="_blank" rel="noopener noreferrer">Crear cuenta de Instagram</a><button id="instagram-disconnect" class="ig-disconnect" type="button" hidden>Desconectar</button></div><small id="instagram-note" class="ig-note">Si todavía no tenés cuenta, creala primero. Después volvé a Lola y elegí “Ya tengo Instagram”.</small></article>
+<article class="channel" id="instagram-channel"><strong>Instagram</strong><br><span id="instagram-status">● Sin conectar</span><div class="ig-actions"><button id="instagram-connect" type="button">Ya tengo Instagram</button><a id="instagram-create" class="ig-create" href="https://www.instagram.com/accounts/signup/" target="_blank" rel="noopener noreferrer">Crear cuenta de Instagram</a><button id="instagram-change" class="ig-change" type="button" hidden>Cambiar perfil</button><button id="instagram-disconnect" class="ig-disconnect" type="button" hidden>Desconectar</button></div><small id="instagram-note" class="ig-note">Si todavía no tenés cuenta, creala primero. Después volvé a Lola y elegí “Ya tengo Instagram”.</small></article>
 <article class="channel"><strong>WhatsApp</strong><br><span>● Sin conectar</span></article>
 <article class="channel"><strong>LinkedIn</strong><br><span>● Sin conectar</span></article>
 <article class="channel"><strong>TikTok</strong><br><span>● Sin conectar</span></article>
@@ -134,6 +134,7 @@ const instagramStatus=document.getElementById('instagram-status');
 const instagramNote=document.getElementById('instagram-note');
 const instagramConnect=document.getElementById('instagram-connect');
 const instagramCreate=document.getElementById('instagram-create');
+const instagramChange=document.getElementById('instagram-change');
 const instagramDisconnect=document.getElementById('instagram-disconnect');
 const photoInput=document.getElementById('photo-input');
 const photoDrop=document.getElementById('photo-drop');
@@ -185,9 +186,10 @@ async function refreshInstagramStatus(){
     previewUser.textContent=connected?'@'+(data.account?.username||'instagram'):'@tu_instagram';
     instagramConnect.hidden=connected;
     instagramCreate.hidden=connected;
+    instagramChange.hidden=!connected;
     instagramDisconnect.hidden=!connected;
     instagramConnect.disabled=false;
-    instagramMessage(connected?'Cuenta vinculada. Ya podés volver a Lola.':'¿No tenés Instagram? Creá la cuenta primero. Cuando termines, volvé acá y conectala.',connected?'ok':'');
+    instagramMessage(connected?'Este mail de DoingLio está vinculado a @'+(data.account?.username||'Instagram')+'. Si querés usar otro perfil, tocá “Cambiar perfil”.':'¿No tenés Instagram? Creá la cuenta primero. Cuando termines, volvé acá y conectala.',connected?'ok':'');
   }catch(error){
     instagramConnect.disabled=false;
     instagramMessage(error.message||'No se pudo consultar el estado de Instagram.','error');
@@ -440,7 +442,7 @@ instagramCreate.addEventListener('click',()=>{
 });
 instagramConnect.addEventListener('click',async()=>{
   instagramConnect.disabled=true;
-  instagramMessage('Abriendo Instagram para autorizar…');
+  instagramMessage('Abriendo Instagram. Elegí el perfil que querés usar con este mail…');
   try{
     const data=await instagramAction('start');
     if(!data.authorize_url)throw new Error('Meta no devolvió el enlace de autorización.');
@@ -448,6 +450,18 @@ instagramConnect.addEventListener('click',async()=>{
   }catch(error){
     instagramConnect.disabled=false;
     instagramMessage(error.message||'No se pudo iniciar la conexión.','error');
+  }
+});
+instagramChange.addEventListener('click',async()=>{
+  instagramChange.disabled=true;
+  instagramMessage('Abriendo Instagram para elegir otro perfil. La conexión actual se conserva si cancelás.');
+  try{
+    const data=await instagramAction('start');
+    if(!data.authorize_url)throw new Error('Meta no devolvió el enlace de autorización.');
+    location.assign(data.authorize_url);
+  }catch(error){
+    instagramChange.disabled=false;
+    instagramMessage(error.message||'No se pudo cambiar el perfil.','error');
   }
 });
 instagramDisconnect.addEventListener('click',async()=>{
@@ -458,6 +472,8 @@ instagramDisconnect.addEventListener('click',async()=>{
     instagramStatus.textContent='● Sin conectar';
     instagramDisconnect.hidden=true;
     instagramDisconnect.disabled=false;
+    instagramChange.hidden=true;
+    instagramChange.disabled=false;
     instagramConnect.hidden=false;
     instagramCreate.hidden=false;
     instagramMessage('Instagram se desconectó.','');
