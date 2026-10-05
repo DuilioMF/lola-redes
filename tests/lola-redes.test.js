@@ -137,7 +137,7 @@ test('L12 permite Publicación, Reel e Historia',()=>{
   assert.match(html,/data-kind="reel"/);
   assert.match(html,/data-kind="story"/);
   assert.match(html,/Publicar Historia/);
-  assert.ok(html.includes("publish_type:currentPublishType"));
+  assert.ok(html.includes("publish_types:[...currentPublishTypes]"));
   assert.ok(html.includes("new Set(['post'])"));
   assert.ok(html.includes("currentPublishTypes.has(type)"));
   assert.ok(html.includes("publish_types:[...currentPublishTypes]"));
