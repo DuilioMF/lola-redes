@@ -95,7 +95,8 @@ async function saveDraft(
     mediaPath: string;
     mediaUrl: string;
     mediaType: "image" | "video";
-    publishType: "post" | "reel" | "story";
+    coverImageUrl: string | null;
+    publishTypes: Array<"post" | "reel" | "story">;
     brief: string;
     caption: string;
   },
@@ -109,7 +110,9 @@ async function saveDraft(
       image_path: payload.mediaPath,
       image_url: payload.mediaUrl,
       media_type: payload.mediaType,
-      publish_type: payload.publishType,
+      publish_type: payload.publishTypes[0] || "post",
+      publish_types: payload.publishTypes,
+      cover_image_url: payload.coverImageUrl,
       brief: payload.brief,
       caption: payload.caption,
       status: "draft",
@@ -125,9 +128,10 @@ async function markPublished(
   userId: string,
   draftId: string | null,
   instagramUserId: string,
-  mediaId: string,
+  publishedMedia: Record<string, string>,
 ) {
   if (!draftId) return;
+  const firstMediaId = Object.values(publishedMedia)[0] || null;
   const url =
     secret("SUPABASE_URL") + "/rest/v1/lola_instagram_posts?id=eq." +
     encodeURIComponent(draftId) + "&user_id=eq." + encodeURIComponent(userId);
@@ -136,7 +140,8 @@ async function markPublished(
     headers: { ...adminHeaders(), Prefer: "return=minimal" },
     body: JSON.stringify({
       instagram_user_id: instagramUserId,
-      instagram_media_id: mediaId,
+      instagram_media_id: firstMediaId,
+      published_media: publishedMedia,
       status: "published",
       error_message: null,
       published_at: new Date().toISOString(),
@@ -295,56 +300,81 @@ Deno.serve(async (req: Request) => {
     if (action === "generate") {
       const mediaUrl = String(body?.media_url || body?.image_url || "").trim();
       const mediaPath = String(body?.media_path || body?.image_path || "").trim();
-      const mediaType: "image" | "video" = String(body?.media_type || "image") === "video" ? "video" : "image";
-      const publishType: "post" | "reel" | "story" =
-        body?.publish_type === "reel" ? "reel" : body?.publish_type === "story" ? "story" : "post";
+      const coverImageUrl = String(body?.cover_url || "").trim() || null;
+      const mediaType: "image" | "video" =
+        String(body?.media_type || "image") === "video" ? "video" : "image";
+      const rawTypes = Array.isArray(body?.publish_types) ? body.publish_types : [body?.publish_type || "post"];
+      const publishTypes = [...new Set(
+        rawTypes
+          .map((value: unknown) => String(value))
+          .filter((value: string) => ["post", "reel", "story"].includes(value)),
+      )] as Array<"post" | "reel" | "story">;
       const brief = String(body?.brief || "").trim();
 
-      if (!mediaUrl || !mediaPath) return json({ error: "missing_media", message: "Elegí una foto o un video primero." }, 400);
-      if (publishType !== "story" && !brief) {
+      if (!mediaUrl || !mediaPath) {
+        return json({ error: "missing_media", message: "Elegí una foto o un video primero." }, 400);
+      }
+      if (!publishTypes.length) {
+        return json({ error: "missing_publish_type", message: "Elegí Publicación, Reel o Historia." }, 400);
+      }
+      const onlyStory = publishTypes.length === 1 && publishTypes[0] === "story";
+      if (!onlyStory && !brief) {
         return json({ error: "missing_brief", message: "Contame qué querés decir con la publicación." }, 400);
       }
-      if (publishType === "post" && mediaType !== "image") {
-        return json({ error: "invalid_media", message: "La Publicación de feed requiere una foto." }, 400);
+      if (publishTypes.includes("reel") && mediaType !== "video") {
+        return json({ error: "invalid_media", message: "Para incluir Reel necesitás un video MP4." }, 400);
       }
-      if (publishType === "reel" && mediaType !== "video") {
-        return json({ error: "invalid_media", message: "El Reel requiere un video MP4." }, 400);
+      if (publishTypes.includes("post") && mediaType === "video" && !coverImageUrl) {
+        return json({ error: "missing_cover", message: "No pude preparar la imagen para la Publicación." }, 400);
       }
 
-      const caption = await generateCaption(mediaUrl, brief, mediaType, publishType);
+      const captionType = publishTypes.includes("reel") ? "reel" : publishTypes.includes("post") ? "post" : "story";
+      const caption = await generateCaption(mediaUrl, brief, mediaType, captionType);
       const draft = await saveDraft(user.id, {
         mediaPath,
         mediaUrl,
         mediaType,
-        publishType,
+        coverImageUrl,
+        publishTypes,
         brief,
         caption,
       });
+
       return json({
         ok: true,
         caption,
         draft_id: draft?.id || null,
         media_type: mediaType,
-        publish_type: publishType,
+        publish_types: publishTypes,
       });
     }
 
     if (action === "publish") {
       const mediaUrl = String(body?.media_url || body?.image_url || "").trim();
-      const mediaType: "image" | "video" = String(body?.media_type || "image") === "video" ? "video" : "image";
-      const publishType: "post" | "reel" | "story" =
-        body?.publish_type === "reel" ? "reel" : body?.publish_type === "story" ? "story" : "post";
+      const coverImageUrl = String(body?.cover_url || "").trim() || null;
+      const mediaType: "image" | "video" =
+        String(body?.media_type || "image") === "video" ? "video" : "image";
+      const rawTypes = Array.isArray(body?.publish_types) ? body.publish_types : [body?.publish_type || "post"];
+      const publishTypes = [...new Set(
+        rawTypes
+          .map((value: unknown) => String(value))
+          .filter((value: string) => ["post", "reel", "story"].includes(value)),
+      )] as Array<"post" | "reel" | "story">;
       const caption = String(body?.caption || "").trim();
       const draftId = body?.draft_id ? String(body.draft_id) : null;
 
-      if (!mediaUrl || (publishType !== "story" && !caption)) {
-        return json({ error: "missing_content", message: "Falta el archivo o el texto." }, 400);
+      if (!mediaUrl || !publishTypes.length) {
+        return json({ error: "missing_content", message: "Falta el archivo o el destino de publicación." }, 400);
       }
-      if (publishType === "post" && mediaType !== "image") {
-        return json({ error: "invalid_media", message: "La Publicación de feed requiere una foto." }, 400);
+      const onlyStory = publishTypes.length === 1 && publishTypes[0] === "story";
+      if (!onlyStory && !caption) {
+        return json({ error: "missing_content", message: "Falta el texto." }, 400);
       }
-      if (publishType === "reel" && mediaType !== "video") {
-        return json({ error: "invalid_media", message: "El Reel requiere un video MP4." }, 400);
+      if (publishTypes.includes("reel") && mediaType !== "video") {
+        return json({ error: "invalid_media", message: "Para incluir Reel necesitás un video MP4." }, 400);
+      }
+      if (publishTypes.includes("post") && mediaType === "video" && !coverImageUrl) {
+        return json({ error: "missing_cover", message: "No pude preparar la imagen para la Publicación." }, 400);
       }
 
       const connection = await getConnection(user.id);
@@ -372,18 +402,50 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
-        const mediaId = await publishMedia(connection, mediaUrl, caption, mediaType, publishType);
+        const publishedMedia: Record<string, string> = {};
+
+        for (const publishType of publishTypes) {
+          if (publishType === "post") {
+            const postUrl = mediaType === "video" ? String(coverImageUrl) : mediaUrl;
+            publishedMedia.post = await publishMedia(
+              connection,
+              postUrl,
+              caption,
+              "image",
+              "post",
+            );
+          } else if (publishType === "reel") {
+            publishedMedia.reel = await publishMedia(
+              connection,
+              mediaUrl,
+              caption,
+              "video",
+              "reel",
+            );
+          } else {
+            publishedMedia.story = await publishMedia(
+              connection,
+              mediaUrl,
+              "",
+              mediaType,
+              "story",
+            );
+          }
+        }
+
         await markPublished(
           user.id,
           draftId,
           String(connection.instagram_user_id),
-          mediaId,
+          publishedMedia,
         );
+
         return json({
           ok: true,
-          media_id: mediaId,
           media_type: mediaType,
-          publish_type: publishType,
+          publish_types: publishTypes,
+          published_types: Object.keys(publishedMedia),
+          published_media: publishedMedia,
           username: connection.username || null,
         });
       } catch (error) {
