@@ -73,12 +73,12 @@ radial-gradient(circle at 22% 75%,#cba45d10 0,transparent 24%),
     <li>Si todavía no tenés cuenta, tocá <strong>Crear cuenta de Instagram</strong>. Registrate en Instagram y después volvé a esta pestaña.</li>
     <li>Para publicar desde Lola, tu cuenta tiene que ser profesional: <strong>Creador o Empresa</strong>. Si es personal, Instagram te permite cambiarla desde la configuración de la cuenta.</li>
     <li>Volvé a Lola y tocá <strong>Ya tengo Instagram</strong>. Aceptá el acceso oficial. Si después querés sumar otro perfil, usá <strong>Autorizar otra cuenta</strong>. El permiso pertenece al perfil de Instagram, no al mail con el que entrás a Lola.</li>
-    <li>Elegí primero <strong>Publicación, Reel o Historia</strong>. Después subí la foto o el video, revisá la vista previa y publicá.</li>
+    <li>Elegí <strong>Publicación, Reel o Historia</strong>. También podés sumar música a una foto: Lola la convierte en video para Reel o Historia antes de publicar.</li>
   </ol>
 </section>
 <section class="composer" id="instagram-composer">
   <div class="composer-head">
-    <div><small>LOLA CREA CON VOS</small><h2>Preparar contenido de Instagram</h2><p>Primero elegí dónde querés publicarlo: publicación, Reel o Historia. Después elegí la foto o el video.</p></div>
+    <div><small>LOLA CREA CON VOS</small><h2>Preparar contenido de Instagram</h2><p>Elegí Publicación, Reel o Historia. Podés usar foto, video o foto + música.</p></div>
   </div>
   <div class="composer-grid">
     <div class="composer-controls">
@@ -231,7 +231,8 @@ function applyPublishType(type){
     currentPublishTypes.add(type);
   }
   updatePublishTypeUI();
-  resetComposerMedia();
+  resetPreparedMedia();
+  currentMediaType=selectedMediaFile?.type==='video/mp4'?'video':'image';
 }
 publishKind.addEventListener('click',(event)=>{
   const btn=event.target.closest('button[data-kind]');
