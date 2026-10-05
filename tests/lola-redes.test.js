@@ -127,3 +127,23 @@ test('L11 acepta video MP4 y lo publica como Reel',()=>{
   assert.ok(migration.includes("video/mp4"));
   assert.ok(migration.includes("104857600"));
 });
+
+
+test('L12 permite Publicación, Reel e Historia',()=>{
+  const composer=fs.readFileSync('supabase/functions/lola-instagram-compose/index.ts','utf8');
+  const migration=fs.readFileSync('supabase/migrations/202610040004_lola_instagram_publish_type.sql','utf8');
+
+  assert.match(html,/data-kind="post"/);
+  assert.match(html,/data-kind="reel"/);
+  assert.match(html,/data-kind="story"/);
+  assert.match(html,/Publicar Historia/);
+  assert.ok(html.includes("publish_type:currentPublishType"));
+  assert.ok(html.includes("applyPublishType('post')"));
+  assert.ok(composer.includes('"STORIES"'));
+  assert.ok(composer.includes('"REELS"'));
+  assert.ok(composer.includes('publish_type: payload.publishType'));
+  assert.ok(composer.includes('publishType === "post"'));
+  assert.ok(composer.includes('publishType === "reel"'));
+  assert.ok(composer.includes('publishType !== "story"'));
+  assert.ok(migration.includes("('post','reel','story')"));
+});
