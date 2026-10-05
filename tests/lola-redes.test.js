@@ -171,3 +171,25 @@ test('L12 puede publicar 1, 2 o 3 destinos desde una sola selección',()=>{
   assert.ok(migration.includes("publish_types text[]"));
   assert.ok(migration.includes("published_media jsonb"));
 });
+
+
+test('L13 convierte foto + música en MP4 para Reel o Historia',()=>{
+  assert.match(html,/id="music-input"/);
+  assert.match(html,/Agregar música/);
+  assert.ok(html.includes("mp4-muxer@5.2.2"));
+  assert.ok(html.includes("createPhotoMusicVideo"));
+  assert.ok(html.includes("VideoEncoder.isConfigSupported"));
+  assert.ok(html.includes("AudioEncoder.isConfigSupported"));
+  assert.ok(html.includes("codec:'avc1.42001f'"));
+  assert.ok(html.includes("codec:'mp4a.40.2'"));
+  assert.ok(html.includes("new File([buffer],'lola-foto-musica-"));
+  assert.ok(html.includes("currentPublishTypes.delete('post')"));
+  assert.ok(html.includes("currentPublishTypes.add('reel')"));
+  assert.ok(html.includes("Con música, Lola publica la foto como Reel o Historia"));
+});
+
+test('L13 conserva foto y música al alternar Reel e Historia',()=>{
+  assert.ok(html.includes("resetPreparedMedia();\n  currentMediaType=selectedMediaFile?.type==='video/mp4'?'video':'image';"));
+  assert.ok(html.includes("selectedMusicFile=file"));
+  assert.ok(html.includes("generatedMusicVideoFile=await createPhotoMusicVideo"));
+});
