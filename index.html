@@ -177,14 +177,17 @@ function applyPublishType(type){
   if(type==='post'){
     publishKindNote.textContent='Publicación: elegí una foto para el feed.';
     photoInput.accept='image/*';
+    postCaption.placeholder='Lola va a preparar el texto de la publicación acá.';
     postPublish.textContent='Publicar';
   }else if(type==='reel'){
     publishKindNote.textContent='Reel: elegí un video MP4.';
     photoInput.accept='video/mp4';
+    postCaption.placeholder='Lola va a preparar el texto del Reel acá.';
     postPublish.textContent='Publicar Reel';
   }else{
-    publishKindNote.textContent='Historia: podés elegir una foto o un video MP4.';
+    publishKindNote.textContent='Historia: foto o video MP4. Instagram publica el archivo; este texto queda solo como nota y no se incrusta sobre la historia.';
     photoInput.accept='image/*,video/mp4';
+    postCaption.placeholder='Nota opcional para esta Historia.';
     postPublish.textContent='Publicar Historia';
   }
   selectedMediaFile=null;
@@ -547,7 +550,7 @@ photoInput.addEventListener('change',()=>{
 postGenerate.addEventListener('click',async()=>{
   if(!selectedMediaFile){composeMessage('Primero elegí una foto o un video.','error');return}
   const brief=postBrief.value.trim();
-  if(!brief){composeMessage('Escribime en una frase qué querés transmitir.','error');return}
+  if(!brief&&currentPublishType!=='story'){composeMessage('Escribime en una frase qué querés transmitir.','error');return}
   postGenerate.disabled=true; postPublish.disabled=true;
   composeMessage(currentMediaType==='video'?'Lola está preparando el texto del Reel…':'Lola está mirando la foto y preparando la publicación…');
   try{
@@ -566,7 +569,7 @@ postGenerate.addEventListener('click',async()=>{
     });
     postCaption.value=data.caption||'';
     currentDraftId=data.draft_id||null;
-    postPublish.disabled=!postCaption.value.trim();
+    postPublish.disabled=!(currentMediaUrl&&(currentPublishType==='story'||postCaption.value.trim()));
     postPublish.textContent=currentPublishType==='story'?'Publicar Historia':currentPublishType==='reel'?'Publicar Reel':'Publicar';
     composeMessage(currentPublishType==='story'?'Historia lista para revisar.':currentPublishType==='reel'?'Reel listo para revisar. Podés editar el texto antes de publicarlo.':'Así quedaría. Podés editar el texto y, cuando te guste, publicar.','ok');
   }catch(error){
@@ -576,10 +579,10 @@ postGenerate.addEventListener('click',async()=>{
   }
 });
 postCaption.addEventListener('input',()=>{
-  postPublish.disabled=!(currentMediaUrl&&postCaption.value.trim());
+  postPublish.disabled=!(currentMediaUrl&&(currentPublishType==='story'||postCaption.value.trim()));
 });
 postPublish.addEventListener('click',async()=>{
-  if(!currentMediaUrl||!postCaption.value.trim()){composeMessage('Primero prepará la publicación.','error');return}
+  if(!currentMediaUrl||(currentPublishType!=='story'&&!postCaption.value.trim())){composeMessage('Primero prepará la publicación.','error');return}
   postPublish.disabled=true; postGenerate.disabled=true;
   composeMessage(currentPublishType==='story'?'Publicando Historia en Instagram…':currentPublishType==='reel'?'Publicando Reel en Instagram…':'Publicando en Instagram…');
   try{
