@@ -91,7 +91,14 @@ async function getConnection(userId: string): Promise<any | null> {
 
 async function saveDraft(
   userId: string,
-  payload: { mediaPath: string; mediaUrl: string; mediaType: "image" | "video"; brief: string; caption: string },
+  payload: {
+    mediaPath: string;
+    mediaUrl: string;
+    mediaType: "image" | "video";
+    publishType: "post" | "reel" | "story";
+    brief: string;
+    caption: string;
+  },
 ) {
   const url = secret("SUPABASE_URL") + "/rest/v1/lola_instagram_posts";
   const response = await fetch(url, {
@@ -102,6 +109,7 @@ async function saveDraft(
       image_path: payload.mediaPath,
       image_url: payload.mediaUrl,
       media_type: payload.mediaType,
+      publish_type: payload.publishType,
       brief: payload.brief,
       caption: payload.caption,
       status: "draft",
@@ -165,12 +173,20 @@ function extractOutputText(result: any): string {
     .trim();
 }
 
-async function generateCaption(mediaUrl: string, brief: string, mediaType: "image" | "video"): Promise<string> {
+async function generateCaption(
+  mediaUrl: string,
+  brief: string,
+  mediaType: "image" | "video",
+  publishType: "post" | "reel" | "story",
+): Promise<string> {
+  if (publishType === "story") return brief.slice(0, 2200);
+
   const openaiKey = secret("OPENAI_API_KEY");
-  const kind = mediaType === "video" ? "video/Reel" : "foto";
+  const kind = publishType === "reel" ? "Reel" : "publicación de feed";
   const prompt = `Sos Lola, especialista en redes sociales. Prepará UN texto listo para Instagram para un ${kind} con esta intención del usuario: "${brief}". No inventes datos. Español rioplatense natural. Agregá 3 a 7 hashtags. Máximo 1200 caracteres.`;
   const content: any[] = [{ type: "input_text", text: prompt }];
   if (mediaType === "image") content.push({ type: "input_image", image_url: mediaUrl, detail: "auto" });
+
   const response = await fetch(OPENAI_API_URL, {
     method: "POST",
     headers: { Authorization: "Bearer " + openaiKey, "Content-Type": "application/json" },
@@ -214,23 +230,51 @@ async function waitForContainer(containerId: string, token: string, mediaType: "
   throw new Error(mediaType === "video" ? "Instagram todavía está procesando el Reel. Probá Publicar otra vez en unos segundos." : "Instagram todavía está procesando la foto. Probá Publicar otra vez en unos segundos.");
 }
 
-async function publishMedia(connection: any, mediaUrl: string, caption: string, mediaType: "image" | "video") {
+async function publishMedia(
+  connection: any,
+  mediaUrl: string,
+  caption: string,
+  mediaType: "image" | "video",
+  publishType: "post" | "reel" | "story",
+) {
   const userId = String(connection.instagram_user_id);
   const token = String(connection.access_token);
-  const createBody = new URLSearchParams({ caption: caption.slice(0, 2200), access_token: token });
-  if (mediaType === "video") {
+  const createBody = new URLSearchParams({ access_token: token });
+
+  if (publishType === "post") {
+    if (mediaType !== "image") throw new Error("La Publicación de feed requiere una foto.");
+    createBody.set("image_url", mediaUrl);
+    if (caption) createBody.set("caption", caption.slice(0, 2200));
+  } else if (publishType === "reel") {
+    if (mediaType !== "video") throw new Error("El Reel requiere un video MP4.");
     createBody.set("media_type", "REELS");
     createBody.set("video_url", mediaUrl);
     createBody.set("share_to_feed", "true");
+    if (caption) createBody.set("caption", caption.slice(0, 2200));
   } else {
-    createBody.set("image_url", mediaUrl);
+    createBody.set("media_type", "STORIES");
+    if (mediaType === "video") createBody.set("video_url", mediaUrl);
+    else createBody.set("image_url", mediaUrl);
   }
-  const created = await instagramRequest(`https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(userId)}/media`, createBody);
+
+  const created = await instagramRequest(
+    `https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(userId)}/media`,
+    createBody,
+  );
   if (!created?.id) throw new Error("Instagram no devolvió el contenedor.");
+
   const containerId = String(created.id);
   await waitForContainer(containerId, token, mediaType);
-  const publishBody = new URLSearchParams({ creation_id: containerId, access_token: token });
-  const published = await instagramRequest(`https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(userId)}/media_publish`, publishBody);
+
+  const publishBody = new URLSearchParams({
+    creation_id: containerId,
+    access_token: token,
+  });
+
+  const published = await instagramRequest(
+    `https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(userId)}/media_publish`,
+    publishBody,
+  );
   if (!published?.id) throw new Error("Instagram no confirmó la publicación.");
   return String(published.id);
 }
@@ -252,22 +296,55 @@ Deno.serve(async (req: Request) => {
       const mediaUrl = String(body?.media_url || body?.image_url || "").trim();
       const mediaPath = String(body?.media_path || body?.image_path || "").trim();
       const mediaType: "image" | "video" = String(body?.media_type || "image") === "video" ? "video" : "image";
+      const publishType: "post" | "reel" | "story" =
+        body?.publish_type === "reel" ? "reel" : body?.publish_type === "story" ? "story" : "post";
       const brief = String(body?.brief || "").trim();
+
       if (!mediaUrl || !mediaPath) return json({ error: "missing_media", message: "Elegí una foto o un video primero." }, 400);
-      if (!brief) return json({ error: "missing_brief", message: "Contame qué querés decir con la publicación." }, 400);
-      const caption = await generateCaption(mediaUrl, brief, mediaType);
-      const draft = await saveDraft(user.id, { mediaPath, mediaUrl, mediaType, brief, caption });
-      return json({ ok: true, caption, draft_id: draft?.id || null, media_type: mediaType });
+      if (publishType !== "story" && !brief) {
+        return json({ error: "missing_brief", message: "Contame qué querés decir con la publicación." }, 400);
+      }
+      if (publishType === "post" && mediaType !== "image") {
+        return json({ error: "invalid_media", message: "La Publicación de feed requiere una foto." }, 400);
+      }
+      if (publishType === "reel" && mediaType !== "video") {
+        return json({ error: "invalid_media", message: "El Reel requiere un video MP4." }, 400);
+      }
+
+      const caption = await generateCaption(mediaUrl, brief, mediaType, publishType);
+      const draft = await saveDraft(user.id, {
+        mediaPath,
+        mediaUrl,
+        mediaType,
+        publishType,
+        brief,
+        caption,
+      });
+      return json({
+        ok: true,
+        caption,
+        draft_id: draft?.id || null,
+        media_type: mediaType,
+        publish_type: publishType,
+      });
     }
 
     if (action === "publish") {
       const mediaUrl = String(body?.media_url || body?.image_url || "").trim();
       const mediaType: "image" | "video" = String(body?.media_type || "image") === "video" ? "video" : "image";
+      const publishType: "post" | "reel" | "story" =
+        body?.publish_type === "reel" ? "reel" : body?.publish_type === "story" ? "story" : "post";
       const caption = String(body?.caption || "").trim();
       const draftId = body?.draft_id ? String(body.draft_id) : null;
 
-      if (!mediaUrl || !caption) {
+      if (!mediaUrl || (publishType !== "story" && !caption)) {
         return json({ error: "missing_content", message: "Falta el archivo o el texto." }, 400);
+      }
+      if (publishType === "post" && mediaType !== "image") {
+        return json({ error: "invalid_media", message: "La Publicación de feed requiere una foto." }, 400);
+      }
+      if (publishType === "reel" && mediaType !== "video") {
+        return json({ error: "invalid_media", message: "El Reel requiere un video MP4." }, 400);
       }
 
       const connection = await getConnection(user.id);
@@ -295,7 +372,7 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
-        const mediaId = await publishMedia(connection, mediaUrl, caption, mediaType);
+        const mediaId = await publishMedia(connection, mediaUrl, caption, mediaType, publishType);
         await markPublished(
           user.id,
           draftId,
@@ -306,6 +383,7 @@ Deno.serve(async (req: Request) => {
           ok: true,
           media_id: mediaId,
           media_type: mediaType,
+          publish_type: publishType,
           username: connection.username || null,
         });
       } catch (error) {
