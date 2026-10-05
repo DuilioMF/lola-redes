@@ -91,7 +91,7 @@ async function getConnection(userId: string): Promise<any | null> {
 
 async function saveDraft(
   userId: string,
-  payload: { imagePath: string; imageUrl: string; brief: string; caption: string },
+  payload: { mediaPath: string; mediaUrl: string; mediaType: "image" | "video"; brief: string; caption: string },
 ) {
   const url = secret("SUPABASE_URL") + "/rest/v1/lola_instagram_posts";
   const response = await fetch(url, {
@@ -99,8 +99,9 @@ async function saveDraft(
     headers: { ...adminHeaders(), Prefer: "return=representation" },
     body: JSON.stringify({
       user_id: userId,
-      image_path: payload.imagePath,
-      image_url: payload.imageUrl,
+      image_path: payload.mediaPath,
+      image_url: payload.mediaUrl,
+      media_type: payload.mediaType,
       brief: payload.brief,
       caption: payload.caption,
       status: "draft",
@@ -164,31 +165,16 @@ function extractOutputText(result: any): string {
     .trim();
 }
 
-async function generateCaption(imageUrl: string, brief: string): Promise<string> {
+async function generateCaption(mediaUrl: string, brief: string, mediaType: "image" | "video"): Promise<string> {
   const openaiKey = secret("OPENAI_API_KEY");
-  const prompt = `Sos Lola, especialista en redes sociales. Prepará UN texto listo para Instagram a partir de la foto y esta intención del usuario: "${brief}".
-Reglas:
-- Español rioplatense natural.
-- Claro, breve y humano; no inventes hechos que no estén en la foto o en la intención.
-- Podés usar 0 a 3 emojis si suman.
-- Agregá entre 3 y 7 hashtags relevantes al final.
-- No incluyas explicaciones, títulos tipo "Caption", comillas ni alternativas.
-- Máximo 1200 caracteres.`;
-
+  const kind = mediaType === "video" ? "video/Reel" : "foto";
+  const prompt = `Sos Lola, especialista en redes sociales. Prepará UN texto listo para Instagram para un ${kind} con esta intención del usuario: "${brief}". No inventes datos. Español rioplatense natural. Agregá 3 a 7 hashtags. Máximo 1200 caracteres.`;
+  const content: any[] = [{ type: "input_text", text: prompt }];
+  if (mediaType === "image") content.push({ type: "input_image", image_url: mediaUrl, detail: "auto" });
   const response = await fetch(OPENAI_API_URL, {
     method: "POST",
     headers: { Authorization: "Bearer " + openaiKey, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      store: false,
-      input: [{
-        role: "user",
-        content: [
-          { type: "input_text", text: prompt },
-          { type: "input_image", image_url: imageUrl, detail: "auto" },
-        ],
-      }],
-    }),
+    body: JSON.stringify({ model: "gpt-4o", store: false, input: [{ role: "user", content }] }),
   });
   const result = await response.json();
   if (!response.ok) throw new Error(result?.error?.message || "No pude generar el texto.");
@@ -214,53 +200,37 @@ async function instagramRequest(url: string, body?: URLSearchParams, method = "P
   return data;
 }
 
-async function publishImage(connection: any, imageUrl: string, caption: string) {
-  const userId = String(connection.instagram_user_id);
-  const token = String(connection.access_token);
-
-  const createBody = new URLSearchParams({
-    image_url: imageUrl,
-    caption: caption.slice(0, 2200),
-    access_token: token,
-  });
-
-  const created = await instagramRequest(
-    `https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(userId)}/media`,
-    createBody,
-  );
-  if (!created?.id) throw new Error("Instagram no devolvió el contenedor de la publicación.");
-
-  const containerId = String(created.id);
-  let finished = false;
-
-  for (let i = 0; i < 8; i++) {
-    const statusUrl =
-      `https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(containerId)}?fields=status_code,status&access_token=${encodeURIComponent(token)}`;
+async function waitForContainer(containerId: string, token: string, mediaType: "image" | "video"): Promise<void> {
+  const attempts = mediaType === "video" ? 30 : 10;
+  const delay = mediaType === "video" ? 4000 : 1200;
+  for (let i = 0; i < attempts; i++) {
+    const statusUrl = `https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(containerId)}?fields=status_code,status&access_token=${encodeURIComponent(token)}`;
     const status = await instagramRequest(statusUrl, undefined, "GET");
     const code = String(status?.status_code || "");
-    if (code === "FINISHED") {
-      finished = true;
-      break;
-    }
-    if (code === "ERROR" || code === "EXPIRED") {
-      throw new Error(status?.status || "Instagram no pudo procesar la foto.");
-    }
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    if (code === "FINISHED") return;
+    if (code === "ERROR" || code === "EXPIRED") throw new Error(status?.status || "Instagram no pudo procesar el archivo.");
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
+  throw new Error(mediaType === "video" ? "Instagram todavía está procesando el Reel. Probá Publicar otra vez en unos segundos." : "Instagram todavía está procesando la foto. Probá Publicar otra vez en unos segundos.");
+}
 
-  if (!finished) {
-    throw new Error("Instagram todavía está procesando la foto. Probá Publicar otra vez en unos segundos.");
+async function publishMedia(connection: any, mediaUrl: string, caption: string, mediaType: "image" | "video") {
+  const userId = String(connection.instagram_user_id);
+  const token = String(connection.access_token);
+  const createBody = new URLSearchParams({ caption: caption.slice(0, 2200), access_token: token });
+  if (mediaType === "video") {
+    createBody.set("media_type", "REELS");
+    createBody.set("video_url", mediaUrl);
+    createBody.set("share_to_feed", "true");
+  } else {
+    createBody.set("image_url", mediaUrl);
   }
-
-  const publishBody = new URLSearchParams({
-    creation_id: containerId,
-    access_token: token,
-  });
-
-  const published = await instagramRequest(
-    `https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(userId)}/media_publish`,
-    publishBody,
-  );
+  const created = await instagramRequest(`https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(userId)}/media`, createBody);
+  if (!created?.id) throw new Error("Instagram no devolvió el contenedor.");
+  const containerId = String(created.id);
+  await waitForContainer(containerId, token, mediaType);
+  const publishBody = new URLSearchParams({ creation_id: containerId, access_token: token });
+  const published = await instagramRequest(`https://graph.instagram.com/${GRAPH_VERSION}/${encodeURIComponent(userId)}/media_publish`, publishBody);
   if (!published?.id) throw new Error("Instagram no confirmó la publicación.");
   return String(published.id);
 }
@@ -279,32 +249,25 @@ Deno.serve(async (req: Request) => {
     const action = String(body?.action || "");
 
     if (action === "generate") {
-      const imageUrl = String(body?.image_url || "").trim();
-      const imagePath = String(body?.image_path || "").trim();
+      const mediaUrl = String(body?.media_url || body?.image_url || "").trim();
+      const mediaPath = String(body?.media_path || body?.image_path || "").trim();
+      const mediaType: "image" | "video" = String(body?.media_type || "image") === "video" ? "video" : "image";
       const brief = String(body?.brief || "").trim();
-
-      if (!imageUrl || !imagePath) {
-        return json({ error: "missing_image", message: "Elegí una foto primero." }, 400);
-      }
-      if (!brief) {
-        return json(
-          { error: "missing_brief", message: "Contame qué querés decir con la publicación." },
-          400,
-        );
-      }
-
-      const caption = await generateCaption(imageUrl, brief);
-      const draft = await saveDraft(user.id, { imagePath, imageUrl, brief, caption });
-      return json({ ok: true, caption, draft_id: draft?.id || null });
+      if (!mediaUrl || !mediaPath) return json({ error: "missing_media", message: "Elegí una foto o un video primero." }, 400);
+      if (!brief) return json({ error: "missing_brief", message: "Contame qué querés decir con la publicación." }, 400);
+      const caption = await generateCaption(mediaUrl, brief, mediaType);
+      const draft = await saveDraft(user.id, { mediaPath, mediaUrl, mediaType, brief, caption });
+      return json({ ok: true, caption, draft_id: draft?.id || null, media_type: mediaType });
     }
 
     if (action === "publish") {
-      const imageUrl = String(body?.image_url || "").trim();
+      const mediaUrl = String(body?.media_url || body?.image_url || "").trim();
+      const mediaType: "image" | "video" = String(body?.media_type || "image") === "video" ? "video" : "image";
       const caption = String(body?.caption || "").trim();
       const draftId = body?.draft_id ? String(body.draft_id) : null;
 
-      if (!imageUrl || !caption) {
-        return json({ error: "missing_content", message: "Falta la foto o el texto." }, 400);
+      if (!mediaUrl || !caption) {
+        return json({ error: "missing_content", message: "Falta el archivo o el texto." }, 400);
       }
 
       const connection = await getConnection(user.id);
@@ -332,7 +295,7 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
-        const mediaId = await publishImage(connection, imageUrl, caption);
+        const mediaId = await publishMedia(connection, mediaUrl, caption, mediaType);
         await markPublished(
           user.id,
           draftId,
@@ -342,6 +305,7 @@ Deno.serve(async (req: Request) => {
         return json({
           ok: true,
           media_id: mediaId,
+          media_type: mediaType,
           username: connection.username || null,
         });
       } catch (error) {
