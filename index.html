@@ -73,7 +73,7 @@ radial-gradient(circle at 22% 75%,#cba45d10 0,transparent 24%),
     <li>Si todavía no tenés cuenta, tocá <strong>Crear cuenta de Instagram</strong>. Registrate en Instagram y después volvé a esta pestaña.</li>
     <li>Para publicar desde Lola, tu cuenta tiene que ser profesional: <strong>Creador o Empresa</strong>. Si es personal, Instagram te permite cambiarla desde la configuración de la cuenta.</li>
     <li>Volvé a Lola y tocá <strong>Ya tengo Instagram</strong>. Aceptá el acceso oficial. Si después querés sumar otro perfil, usá <strong>Autorizar otra cuenta</strong>. El permiso pertenece al perfil de Instagram, no al mail con el que entrás a Lola.</li>
-    <li>Elegí una foto o un video, contame qué querés transmitir y revisá la vista previa. Si es video, Lola lo publica como <strong>Reel</strong>.</li>
+    <li>Elegí primero <strong>Publicación, Reel o Historia</strong>. Después subí la foto o el video, revisá la vista previa y publicá.</li>
   </ol>
 </section>
 <section class="composer" id="instagram-composer">
@@ -207,6 +207,7 @@ publishKind.addEventListener('click',(event)=>{
   if(!btn)return;
   applyPublishType(btn.dataset.kind);
 });
+applyPublishType('post');
 
 function renderInstagramProfiles(accounts){
   const profiles=Array.isArray(accounts)?accounts:[];
