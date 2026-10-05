@@ -162,6 +162,8 @@ const publishKindNote=document.getElementById('publish-kind-note');
 let selectedMediaFile=null;
 let currentMediaPath='';
 let currentMediaUrl='';
+let currentCoverPath='';
+let currentCoverUrl='';
 let currentDraftId=null;
 let currentMediaType='image';
 let currentPublishTypes=new Set(['post']);
@@ -186,6 +188,8 @@ function resetComposerMedia(){
   selectedMediaFile=null;
   currentMediaPath='';
   currentMediaUrl='';
+  currentCoverPath='';
+  currentCoverUrl='';
   currentDraftId=null;
   photoInput.value='';
   photoPreview.removeAttribute('src');
@@ -458,6 +462,54 @@ async function fileToInstagramJpeg(file){
   const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('No pude preparar la foto.')),'image/jpeg',0.92));
   return blob;
 }
+async function videoCoverToJpeg(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const video=document.createElement('video');
+    video.muted=true;
+    video.playsInline=true;
+    video.preload='auto';
+    video.src=url;
+    await new Promise((resolve,reject)=>{
+      video.onloadeddata=resolve;
+      video.onerror=()=>reject(new Error('No pude leer el video para generar la imagen de Publicación.'));
+    });
+    const target=Math.min(0.5,Math.max(0,(video.duration||0)/4));
+    if(Number.isFinite(target)&&target>0){
+      await new Promise((resolve)=>{
+        video.onseeked=resolve;
+        video.currentTime=target;
+      });
+    }
+    const canvas=document.createElement('canvas');
+    canvas.width=1080;
+    canvas.height=1350;
+    const ctx=canvas.getContext('2d',{alpha:false});
+    ctx.fillStyle='#000000';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    const scale=Math.min(canvas.width/video.videoWidth,canvas.height/video.videoHeight);
+    const width=video.videoWidth*scale;
+    const height=video.videoHeight*scale;
+    ctx.drawImage(video,(canvas.width-width)/2,(canvas.height-height)/2,width,height);
+    return await new Promise((resolve,reject)=>
+      canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('No pude generar la imagen de Publicación.')),'image/jpeg',0.92)
+    );
+  }finally{
+    URL.revokeObjectURL(url);
+  }
+}
+async function uploadInstagramCover(file){
+  const {data:{user},error:userError}=await sb.auth.getUser();
+  if(userError||!user)throw new Error('Volvé a entrar a Lola con tu mail.');
+  const blob=await videoCoverToJpeg(file);
+  const path=user.id+'/'+Date.now()+'-'+crypto.randomUUID()+'-cover.jpg';
+  const {error}=await sb.storage.from('instagram').upload(path,blob,{contentType:'image/jpeg',upsert:false,cacheControl:'3600'});
+  if(error)throw error;
+  const {data}=sb.storage.from('instagram').getPublicUrl(path);
+  if(!data?.publicUrl)throw new Error('No pude obtener la imagen de Publicación.');
+  return {path,url:data.publicUrl};
+}
+
 async function uploadInstagramMedia(file){
   const {data:{user},error:userError}=await sb.auth.getUser();
   if(userError||!user)throw new Error('Volvé a entrar a Lola con tu mail.');
@@ -523,7 +575,7 @@ photoInput.addEventListener('change',()=>{
 
   selectedMediaFile=file;
   currentMediaType=isVideo?'video':'image';
-  currentMediaPath=''; currentMediaUrl=''; currentDraftId=null;
+  currentMediaPath=''; currentMediaUrl=''; currentCoverPath=''; currentCoverUrl=''; currentDraftId=null;
   postPublish.disabled=true;
   updatePublishTypeUI();
 
@@ -569,10 +621,18 @@ postGenerate.addEventListener('click',async()=>{
       currentMediaUrl=uploaded.url;
       currentMediaType=uploaded.media_type;
     }
+    if(currentMediaType==='video'&&currentPublishTypes.has('post')&&!currentCoverUrl){
+      composeMessage('Lola está sacando una imagen del video para la Publicación…');
+      const cover=await uploadInstagramCover(selectedMediaFile);
+      currentCoverPath=cover.path;
+      currentCoverUrl=cover.url;
+    }
     const data=await composerAction('generate',{
       media_path:currentMediaPath,
       media_url:currentMediaUrl,
       media_type:currentMediaType,
+      cover_path:currentCoverPath,
+      cover_url:currentCoverUrl,
       publish_types:[...currentPublishTypes],
       brief
     });
@@ -599,6 +659,7 @@ postPublish.addEventListener('click',async()=>{
     const data=await composerAction('publish',{
       media_url:currentMediaUrl,
       media_type:currentMediaType,
+      cover_url:currentCoverUrl,
       publish_types:[...currentPublishTypes],
       caption:postCaption.value.trim(),
       draft_id:currentDraftId
