@@ -108,3 +108,22 @@ test('L10 separa el permiso de Instagram del usuario de Lola',()=>{
   assert.ok(migration.includes('from public.lola_instagram_connections'));
   assert.ok(migration.includes('connected_by uuid'));
 });
+
+
+test('L11 acepta video MP4 y lo publica como Reel',()=>{
+  const composer=fs.readFileSync('supabase/functions/lola-instagram-compose/index.ts','utf8');
+  const migration=fs.readFileSync('supabase/migrations/202610040003_lola_instagram_video.sql','utf8');
+
+  assert.match(html,/accept="image\/\*,video\/mp4"/);
+  assert.match(html,/id="video-preview"/);
+  assert.match(html,/Publicar Reel/);
+  assert.ok(html.includes("uploadInstagramMedia"));
+  assert.ok(html.includes("media_type:currentMediaType"));
+  assert.ok(composer.includes('"REELS"'));
+  assert.ok(composer.includes('"video_url"'));
+  assert.ok(composer.includes('"share_to_feed", "true"'));
+  assert.ok(composer.includes('publishMedia'));
+  assert.ok(composer.includes('media_type: payload.mediaType'));
+  assert.ok(migration.includes("video/mp4"));
+  assert.ok(migration.includes("104857600"));
+});
