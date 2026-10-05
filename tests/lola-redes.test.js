@@ -127,3 +127,47 @@ test('L11 acepta video MP4 y lo publica como Reel',()=>{
   assert.ok(migration.includes("video/mp4"));
   assert.ok(migration.includes("104857600"));
 });
+
+
+test('L12 permite Publicación, Reel e Historia',()=>{
+  const composer=fs.readFileSync('supabase/functions/lola-instagram-compose/index.ts','utf8');
+  const migration=fs.readFileSync('supabase/migrations/202610040004_lola_instagram_publish_type.sql','utf8');
+
+  assert.match(html,/data-kind="post"/);
+  assert.match(html,/data-kind="reel"/);
+  assert.match(html,/data-kind="story"/);
+  assert.match(html,/Publicar Historia/);
+  assert.ok(html.includes("publish_types:[...currentPublishTypes]"));
+  assert.ok(html.includes("new Set(['post'])"));
+  assert.ok(html.includes("currentPublishTypes.has(type)"));
+  assert.ok(html.includes("publish_types:[...currentPublishTypes]"));
+  assert.ok(html.includes("uploadInstagramCover"));
+  assert.ok(composer.includes('"STORIES"'));
+  assert.ok(composer.includes('"REELS"'));
+  assert.ok(composer.includes('publish_type: payload.publishType'));
+  assert.ok(composer.includes('publishTypes.includes("post")'));
+  assert.ok(composer.includes('publishTypes.includes("reel")'));
+  assert.ok(composer.includes('published_types'));
+  assert.ok(composer.includes('published_media'));
+  assert.ok(composer.includes('coverImageUrl'));
+  assert.ok(migration.includes("('post','reel','story')"));
+});
+
+
+test('L12 puede publicar 1, 2 o 3 destinos desde una sola selección',()=>{
+  const composer=fs.readFileSync('supabase/functions/lola-instagram-compose/index.ts','utf8');
+  const migration=fs.readFileSync('supabase/migrations/202610040005_lola_instagram_multi_publish.sql','utf8');
+
+  assert.ok(html.includes("currentPublishTypes=new Set(['post'])"));
+  assert.ok(html.includes("currentPublishTypes.size===1"));
+  assert.ok(html.includes("currentPublishTypes.add(type)"));
+  assert.ok(html.includes("currentPublishTypes.delete(type)"));
+  assert.ok(html.includes("videoCoverToJpeg"));
+  assert.ok(html.includes("cover_url:currentCoverUrl"));
+  assert.ok(composer.includes("for (const publishType of publishTypes)"));
+  assert.ok(composer.includes("publishedMedia.post"));
+  assert.ok(composer.includes("publishedMedia.reel"));
+  assert.ok(composer.includes("publishedMedia.story"));
+  assert.ok(migration.includes("publish_types text[]"));
+  assert.ok(migration.includes("published_media jsonb"));
+});
