@@ -34,11 +34,15 @@ function secret(name: string): string {
 }
 
 function facebookAppId(): string {
-  return Deno.env.get("FACEBOOK_APP_ID") || facebookAppId();
+  const value = Deno.env.get("FACEBOOK_APP_ID") || Deno.env.get("META_APP_ID");
+  if (!value) throw new Error("Falta configurar FACEBOOK_APP_ID para conectar Facebook.");
+  return value;
 }
 
 function facebookAppSecret(): string {
-  return Deno.env.get("FACEBOOK_APP_SECRET") || facebookAppSecret();
+  const value = Deno.env.get("FACEBOOK_APP_SECRET") || Deno.env.get("META_APP_SECRET");
+  if (!value) throw new Error("Falta configurar FACEBOOK_APP_SECRET para conectar Facebook.");
+  return value;
 }
 
 function publishableKey(): string {
