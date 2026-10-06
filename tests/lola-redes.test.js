@@ -224,3 +224,19 @@ test('L14 conecta Facebook con autorización oficial de Meta',()=>{
   assert.ok(migration.includes('revoke all on table public.lola_facebook_pages from anon, authenticated, public'));
   assert.doesNotMatch(html,/facebook-password/);
 });
+
+
+test('L15 elige Instagram, Facebook o ambos y limpia el contenido publicado',()=>{
+  const backend=fs.readFileSync('supabase/functions/lola-facebook-oauth/index.ts','utf8');
+  assert.match(html,/id="publish-network"/);
+  assert.match(html,/data-network="instagram"/);
+  assert.match(html,/data-network="facebook"/);
+  assert.ok(html.includes("currentPublishNetworks=new Set(['instagram'])"));
+  assert.ok(html.includes("facebookAction('publish'"));
+  assert.ok(html.includes("resetComposerAfterPublish"));
+  assert.ok(html.includes("Ya podés elegir otra foto o video"));
+  assert.ok(backend.includes('body.action === "publish"'));
+  assert.ok(backend.includes('video_reels'));
+  assert.ok(backend.includes('video_stories'));
+  assert.ok(backend.includes('FACEBOOK_APP_ID'));
+});
