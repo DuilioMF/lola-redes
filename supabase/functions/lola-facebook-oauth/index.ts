@@ -33,6 +33,14 @@ function secret(name: string): string {
   return value;
 }
 
+function facebookAppId(): string {
+  return Deno.env.get("FACEBOOK_APP_ID") || facebookAppId();
+}
+
+function facebookAppSecret(): string {
+  return Deno.env.get("FACEBOOK_APP_SECRET") || facebookAppSecret();
+}
+
 function publishableKey(): string {
   const modern = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
   if (modern) {
@@ -263,8 +271,8 @@ async function disconnectPage(userId: string, pageId?: string): Promise<PublicPa
 }
 
 async function authorizeUrl(userId: string): Promise<string> {
-  const appId = secret("META_APP_ID");
-  const appSecret = secret("META_APP_SECRET");
+  const appId = facebookAppId();
+  const appSecret = facebookAppSecret();
   const callback = secret("SUPABASE_URL").replace(/\/$/, "") + "/functions/v1/" + FUNCTION_NAME;
   const state = await signState(
     { userId, expiresAt: Date.now() + 10 * 60 * 1000, nonce: crypto.randomUUID() },
@@ -282,8 +290,8 @@ async function authorizeUrl(userId: string): Promise<string> {
 }
 
 async function exchangeCode(code: string): Promise<string> {
-  const appId = secret("META_APP_ID");
-  const appSecret = secret("META_APP_SECRET");
+  const appId = facebookAppId();
+  const appSecret = facebookAppSecret();
   const callback = secret("SUPABASE_URL").replace(/\/$/, "") + "/functions/v1/" + FUNCTION_NAME;
 
   const url = new URL("https://graph.facebook.com/" + GRAPH_VERSION + "/oauth/access_token");
@@ -330,6 +338,149 @@ async function facebookPages(token: string): Promise<Array<{ id: string; name: s
     .filter((page: any) => page.id && page.access_token);
 }
 
+
+type PageConnection = { page_id: string; name: string; access_token: string };
+
+async function selectedPageConnection(userId: string): Promise<PageConnection | null> {
+  const accessIds = await getAccessIds(userId);
+  if (!accessIds.length) return null;
+
+  let selectedId = await getSelection(userId);
+  if (!selectedId || !accessIds.includes(selectedId)) {
+    selectedId = accessIds[0];
+    await setSelection(userId, selectedId);
+  }
+
+  const response = await fetch(
+    restTable(
+      "lola_facebook_pages",
+      "?select=page_id,name,access_token&page_id=eq." + encodeURIComponent(selectedId) + "&limit=1",
+    ),
+    { headers: adminHeaders() },
+  );
+  if (!response.ok) throw new Error("No pude consultar la Página activa de Facebook.");
+  const rows = await response.json();
+  if (!Array.isArray(rows) || !rows.length) return null;
+  return {
+    page_id: String(rows[0].page_id || ""),
+    name: String(rows[0].name || "Facebook"),
+    access_token: String(rows[0].access_token || ""),
+  };
+}
+
+async function facebookForm(url: string, fields: Record<string, string>): Promise<any> {
+  const body = new URLSearchParams(fields);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = data?.error?.error_user_msg || data?.error?.message || "Facebook rechazó la publicación.";
+    throw new Error(message);
+  }
+  return data;
+}
+
+async function publishFacebookPage(
+  page: PageConnection,
+  mediaUrl: string,
+  caption: string,
+  mediaType: "image" | "video",
+): Promise<string> {
+  if (mediaType === "image") {
+    const data = await facebookForm(
+      "https://graph.facebook.com/" + GRAPH_VERSION + "/" + encodeURIComponent(page.page_id) + "/photos",
+      {
+        url: mediaUrl,
+        caption: caption.slice(0, 5000),
+        published: "true",
+        access_token: page.access_token,
+      },
+    );
+    return String(data?.post_id || data?.id || "");
+  }
+
+  const data = await facebookForm(
+    "https://graph.facebook.com/" + GRAPH_VERSION + "/" + encodeURIComponent(page.page_id) + "/videos",
+    {
+      file_url: mediaUrl,
+      description: caption.slice(0, 5000),
+      access_token: page.access_token,
+    },
+  );
+  return String(data?.id || "");
+}
+
+async function publishFacebookVideoSurface(
+  page: PageConnection,
+  mediaUrl: string,
+  caption: string,
+  kind: "reel" | "story",
+): Promise<string> {
+  const edge = kind === "reel" ? "video_reels" : "video_stories";
+  const start = await facebookForm(
+    "https://graph.facebook.com/" + GRAPH_VERSION + "/" + encodeURIComponent(page.page_id) + "/" + edge,
+    { upload_phase: "start", access_token: page.access_token },
+  );
+  const videoId = String(start?.video_id || "");
+  const uploadUrl = String(start?.upload_url || "");
+  if (!videoId || !uploadUrl) throw new Error("Facebook no devolvió los datos para subir " + (kind === "reel" ? "el Reel." : "la Historia."));
+
+  const upload = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      Authorization: "OAuth " + page.access_token,
+      file_url: mediaUrl,
+    },
+  });
+  if (!upload.ok) {
+    const data = await upload.json().catch(() => ({}));
+    throw new Error(data?.error?.message || "Facebook no pudo recibir el video.");
+  }
+
+  const fields: Record<string, string> = {
+    upload_phase: "finish",
+    video_id: videoId,
+    access_token: page.access_token,
+  };
+  if (kind === "reel") {
+    fields.video_state = "PUBLISHED";
+    if (caption) fields.description = caption.slice(0, 5000);
+  }
+  const finish = await facebookForm(
+    "https://graph.facebook.com/" + GRAPH_VERSION + "/" + encodeURIComponent(page.page_id) + "/" + edge,
+    fields,
+  );
+  return String(finish?.id || videoId);
+}
+
+async function publishToFacebook(
+  userId: string,
+  mediaUrl: string,
+  caption: string,
+  mediaType: "image" | "video",
+  publishTypes: Array<"post" | "reel" | "story">,
+): Promise<{ page: PageConnection; published: Record<string, string> }> {
+  const page = await selectedPageConnection(userId);
+  if (!page) throw new Error("Primero conectá una Página de Facebook desde Lola.");
+
+  const published: Record<string, string> = {};
+  for (const type of publishTypes) {
+    if (type === "post") {
+      published.post = await publishFacebookPage(page, mediaUrl, caption, mediaType);
+    } else if (type === "reel") {
+      if (mediaType !== "video") throw new Error("Para publicar un Reel en Facebook usá un video o foto + música.");
+      published.reel = await publishFacebookVideoSurface(page, mediaUrl, caption, "reel");
+    } else {
+      if (mediaType !== "video") throw new Error("Para publicar una Historia en Facebook usá un video o foto + música.");
+      published.story = await publishFacebookVideoSurface(page, mediaUrl, "", "story");
+    }
+  }
+  return { page, published };
+}
+
 async function callback(request: Request): Promise<Response> {
   const params = new URL(request.url).searchParams;
   if (params.has("error")) return redirectToSite("cancelled");
@@ -338,7 +489,7 @@ async function callback(request: Request): Promise<Response> {
   if (!code || !stateValue) return redirectToSite("error");
 
   try {
-    const state = await readState(stateValue, secret("META_APP_SECRET"));
+    const state = await readState(stateValue, facebookAppSecret());
     if (!state) return redirectToSite("error");
     const token = await exchangeCode(code);
     const pages = await facebookPages(token);
@@ -389,6 +540,31 @@ Deno.serve(async (request: Request) => {
         connected: pages.length > 0,
         pages,
         active_page: pages.find((page) => page.selected) || null,
+      });
+    }
+
+    if (body.action === "publish") {
+      const mediaUrl = String(body.media_url || "").trim();
+      const mediaType: "image" | "video" = String(body.media_type || "image") === "video" ? "video" : "image";
+      const caption = String(body.caption || "").trim();
+      const rawTypes = Array.isArray(body.publish_types) ? body.publish_types : [body.publish_type || "post"];
+      const publishTypes = [...new Set(
+        rawTypes
+          .map((value: unknown) => String(value))
+          .filter((value: string) => ["post", "reel", "story"].includes(value)),
+      )] as Array<"post" | "reel" | "story">;
+
+      if (!mediaUrl || !publishTypes.length) {
+        return json({ error: "missing_content", message: "Falta el archivo o el formato de publicación." }, 400);
+      }
+
+      const result = await publishToFacebook(user.id, mediaUrl, caption, mediaType, publishTypes);
+      return json({
+        ok: true,
+        page_id: result.page.page_id,
+        page_name: result.page.name,
+        published_types: Object.keys(result.published),
+        published_media: result.published,
       });
     }
 
