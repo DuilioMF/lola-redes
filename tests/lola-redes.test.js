@@ -193,3 +193,34 @@ test('L13 conserva foto y música al alternar Reel e Historia',()=>{
   assert.ok(html.includes("selectedMusicFile=file"));
   assert.ok(html.includes("generatedMusicVideoFile=await createPhotoMusicVideo"));
 });
+
+
+test('L14 conecta Facebook con autorización oficial de Meta',()=>{
+  const backend=fs.readFileSync('supabase/functions/lola-facebook-oauth/index.ts','utf8');
+  const migration=fs.readFileSync('supabase/migrations/202610060001_lola_facebook_pages.sql','utf8');
+
+  assert.match(html,/id="facebook-channel"/);
+  assert.match(html,/id="facebook-connect"/);
+  assert.match(html,/id="facebook-status"/);
+  assert.match(html,/id="facebook-page-select"/);
+  assert.ok(html.includes("sb.functions.invoke('lola-facebook-oauth'"));
+  assert.ok(html.includes("searchParams.get('facebook')"));
+  assert.ok(html.includes("facebookAction('select'"));
+  assert.ok(html.includes("facebookAction('disconnect'"));
+
+  assert.ok(backend.includes('https://www.facebook.com/'));
+  assert.ok(backend.includes('/dialog/oauth'));
+  assert.ok(backend.includes('pages_show_list'));
+  assert.ok(backend.includes('pages_read_engagement'));
+  assert.ok(backend.includes('pages_manage_posts'));
+  assert.ok(backend.includes('/me/accounts'));
+  assert.ok(backend.includes('META_APP_SECRET'));
+  assert.ok(backend.includes('/auth/v1/user'));
+
+  assert.ok(migration.includes('create table if not exists public.lola_facebook_pages'));
+  assert.ok(migration.includes('create table if not exists public.lola_facebook_page_access'));
+  assert.ok(migration.includes('create table if not exists public.lola_facebook_page_selection'));
+  assert.ok(migration.toLowerCase().includes('enable row level security'));
+  assert.ok(migration.includes('revoke all on table public.lola_facebook_pages from anon, authenticated, public'));
+  assert.doesNotMatch(html,/facebook-password|META_APP_SECRET/);
+});
