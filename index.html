@@ -60,7 +60,7 @@ radial-gradient(circle at 22% 75%,#cba45d10 0,transparent 24%),
 </header>
 <section class="hero"><div class="ey" id="lola-version">ESPECIALISTA DE DOINGLIO · comprobando versión</div><h1>Hola, soy <em>Lola.</em></h1><p class="lead">¿En qué puedo ayudarte? No necesitás saber de redes. Contame qué querés lograr y yo te voy guiando.</p><div class="voice">🎙 Conversación por voz · <button id="lola-greet" type="button" style="border:0;background:transparent;color:inherit;font:inherit;font-weight:800;cursor:pointer">Escuchar a Lola</button></div></section>
 <section class="channels">
-<article class="channel"><strong>Facebook</strong><br><span>● Sin conectar</span></article>
+<article class="channel" id="facebook-channel"><strong>Facebook</strong><br><span id="facebook-status">● Sin conectar</span><select id="facebook-page-select" class="ig-profile-select" hidden aria-label="Página de Facebook"></select><div class="ig-actions"><button id="facebook-connect" type="button">Conectar Facebook</button><button id="facebook-change" class="ig-change" type="button" hidden>Autorizar otra cuenta</button><button id="facebook-disconnect" class="ig-disconnect" type="button" hidden>Desconectar</button></div><small id="facebook-note" class="ig-note">Autorizá tu cuenta de Meta y Lola te muestra las Páginas de Facebook que administrás.</small></article>
 <article class="channel" id="instagram-channel"><strong>Instagram</strong><br><span id="instagram-status">● Sin conectar</span><select id="instagram-profile-select" class="ig-profile-select" hidden aria-label="Perfil de Instagram"></select><select id="instagram-available-select" class="ig-profile-select" hidden aria-label="Cuenta de Instagram ya autorizada"></select><div class="ig-actions"><button id="instagram-connect" type="button">Ya tengo Instagram</button><a id="instagram-create" class="ig-create" href="https://www.instagram.com/accounts/signup/" target="_blank" rel="noopener noreferrer">Crear cuenta de Instagram</a><button id="instagram-change" class="ig-change" type="button" hidden>Autorizar otra cuenta</button><button id="instagram-link-existing" class="ig-change" type="button" hidden>Usar cuenta ya autorizada</button><button id="instagram-disconnect" class="ig-disconnect" type="button" hidden>Desconectar</button></div><small id="instagram-note" class="ig-note">Si todavía no tenés cuenta, creala primero. Después volvé a Lola y elegí “Ya tengo Instagram”.</small></article>
 <article class="channel"><strong>WhatsApp</strong><br><span>● Sin conectar</span></article>
 <article class="channel"><strong>LinkedIn</strong><br><span>● Sin conectar</span></article>
@@ -143,6 +143,14 @@ const submit=document.getElementById('auth-submit');
 const status=document.getElementById('auth-status');
 const app=document.getElementById('lola-app');
 const account=document.getElementById('account-label');
+
+const facebookChannel=document.getElementById('facebook-channel');
+const facebookStatus=document.getElementById('facebook-status');
+const facebookNote=document.getElementById('facebook-note');
+const facebookConnect=document.getElementById('facebook-connect');
+const facebookChange=document.getElementById('facebook-change');
+const facebookDisconnect=document.getElementById('facebook-disconnect');
+const facebookPageSelect=document.getElementById('facebook-page-select');
 
 const instagramChannel=document.getElementById('instagram-channel');
 const instagramStatus=document.getElementById('instagram-status');
@@ -337,6 +345,76 @@ function showInstagramReturn(){
   else instagramMessage('No se pudo completar la conexión. Volvé a intentar desde Lola; si sigue pasando, te ayudo a resolverlo.','error');
 }
 
+function facebookMessage(message,type=''){
+  facebookNote.className='ig-note'+(type?' '+type:'');
+  facebookNote.textContent=message;
+}
+async function facebookAction(action,payload={}){
+  const {data,error}=await sb.functions.invoke('lola-facebook-oauth',{body:{action,...payload}});
+  if(error){
+    let message=data?.message||'';
+    try{
+      const p=await error.context?.clone?.().json();
+      message=p?.message||message;
+    }catch(_){}
+    throw new Error(message||error.message||'No se pudo conectar con Facebook.');
+  }
+  if(data?.error)throw new Error(data.message||'No se pudo conectar con Facebook.');
+  return data;
+}
+function renderFacebookPages(pages){
+  facebookPageSelect.innerHTML='';
+  for(const page of pages){
+    const option=document.createElement('option');
+    option.value=page.page_id;
+    option.textContent=page.name||'Facebook';
+    option.selected=!!page.selected;
+    facebookPageSelect.appendChild(option);
+  }
+  facebookPageSelect.hidden=pages.length<2;
+}
+async function refreshFacebookStatus(){
+  if(!document.body.classList.contains('authenticated'))return;
+  facebookConnect.disabled=true;
+  try{
+    const data=await facebookAction('status');
+    const pages=Array.isArray(data.pages)?data.pages:[];
+    const active=data.active_page||pages.find(page=>page.selected)||pages[0]||null;
+    const connected=pages.length>0;
+    facebookChannel.classList.toggle('connected',connected);
+    facebookStatus.textContent=connected?'● Conectada: '+(active?.name||'Facebook'):'● Sin conectar';
+    facebookConnect.hidden=connected;
+    facebookChange.hidden=!connected;
+    facebookDisconnect.hidden=!connected;
+    facebookConnect.disabled=false;
+    renderFacebookPages(pages);
+    if(connected){
+      facebookMessage(
+        pages.length>1
+          ? 'Tenés '+pages.length+' Páginas habilitadas. Elegí cuál querés usar.'
+          : 'Está habilitada '+(active?.name||'tu Página')+'. Si querés sumar otra, tocá “Autorizar otra cuenta”.',
+        'ok'
+      );
+    }else{
+      facebookMessage('Tocá “Conectar Facebook”. Meta te pedirá autorización oficial y Lola cargará tus Páginas.');
+    }
+  }catch(error){
+    facebookConnect.disabled=false;
+    facebookMessage(error.message||'No se pudo consultar Facebook.','error');
+  }
+}
+function showFacebookReturn(){
+  const url=new URL(location.href);
+  const result=url.searchParams.get('facebook');
+  if(!result)return;
+  url.searchParams.delete('facebook');
+  history.replaceState({},document.title,url.pathname+url.search);
+  if(result==='connected')facebookMessage('Facebook quedó conectado a Lola.','ok');
+  else if(result==='connected_multiple')facebookMessage('Facebook quedó conectado. Tenés más de una Página disponible: elegí la que querés usar.','ok');
+  else if(result==='cancelled')facebookMessage('Cancelaste la conexión con Facebook. No se hicieron cambios.');
+  else facebookMessage('No se pudo completar la conexión con Facebook. Volvé a intentar desde Lola.','error');
+}
+
 function setStatus(message,type=''){
   status.className='auth-status'+(type?' '+type:'');
   status.innerHTML=message;
@@ -382,8 +460,9 @@ async function init(){
     if(session){
       clearPendingOtp();
       setStatus('');
-      await refreshInstagramStatus();
+      await Promise.all([refreshInstagramStatus(),refreshFacebookStatus()]);
       showInstagramReturn();
+      showFacebookReturn();
       return;
     }
   }catch(error){
@@ -461,6 +540,7 @@ sb.auth.onAuthStateChange((event,session)=>{
   if(session){
     clearPendingOtp();
     void refreshInstagramStatus();
+    void refreshFacebookStatus();
     if(event==='SIGNED_IN'){
       try{history.replaceState({},document.title,location.pathname+location.search)}catch(_){}
     }
@@ -896,6 +976,63 @@ postPublish.addEventListener('click',async()=>{
     postGenerate.disabled=false;
   }
 });
+
+facebookPageSelect.addEventListener('change',async()=>{
+  const pageId=facebookPageSelect.value;
+  if(!pageId)return;
+  facebookPageSelect.disabled=true;
+  try{
+    const data=await facebookAction('select',{page_id:pageId});
+    const active=data.active_page||null;
+    facebookStatus.textContent='● Conectada: '+(active?.name||'Facebook');
+    facebookMessage('Página activa: '+(active?.name||'Facebook')+'.','ok');
+    renderFacebookPages(data.pages||[]);
+  }catch(error){
+    facebookMessage(error.message||'No pude cambiar la Página de Facebook.','error');
+    await refreshFacebookStatus();
+  }finally{
+    facebookPageSelect.disabled=false;
+  }
+});
+facebookConnect.addEventListener('click',async()=>{
+  facebookConnect.disabled=true;
+  facebookMessage('Abriendo Meta para autorizar Facebook. Lola no ve ni guarda tu contraseña.');
+  try{
+    const data=await facebookAction('start');
+    if(!data.authorize_url)throw new Error('Meta no devolvió el enlace de autorización.');
+    location.assign(data.authorize_url);
+  }catch(error){
+    facebookConnect.disabled=false;
+    facebookMessage(error.message||'No se pudo iniciar la conexión con Facebook.','error');
+  }
+});
+facebookChange.addEventListener('click',async()=>{
+  facebookChange.disabled=true;
+  facebookMessage('Abriendo Meta para autorizar otra cuenta o más Páginas.');
+  try{
+    const data=await facebookAction('add');
+    if(!data.authorize_url)throw new Error('Meta no devolvió el enlace de autorización.');
+    location.assign(data.authorize_url);
+  }catch(error){
+    facebookChange.disabled=false;
+    facebookMessage(error.message||'No se pudo iniciar otra autorización de Facebook.','error');
+  }
+});
+facebookDisconnect.addEventListener('click',async()=>{
+  facebookDisconnect.disabled=true;
+  try{
+    const pageId=facebookPageSelect.value||undefined;
+    await facebookAction('disconnect',pageId?{page_id:pageId}:{});
+    facebookMessage('La Página seleccionada se desconectó de Lola.');
+    await refreshFacebookStatus();
+  }catch(error){
+    facebookMessage(error.message||'No se pudo desconectar Facebook.','error');
+  }finally{
+    facebookDisconnect.disabled=false;
+    facebookChange.disabled=false;
+  }
+});
+showFacebookReturn();
 
 instagramProfileSelect.addEventListener('change',async()=>{
   const id=instagramProfileSelect.value;
