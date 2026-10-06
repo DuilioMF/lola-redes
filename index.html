@@ -209,7 +209,11 @@ function publishTypeLabel(type){
 }
 function updatePublishButton(){
   const networks=[...currentPublishNetworks].map(networkLabel).join(' + ');
-  postPublish.textContent='Publicar en '+networks;
+  const selected=[...currentPublishTypes];
+  const action=selected.length===1
+    ? (selected[0]==='reel'?'Publicar Reel':selected[0]==='story'?'Publicar Historia':'Publicar')
+    : 'Publicar '+selected.length+' formatos';
+  postPublish.textContent=action+' en '+networks;
 }
 function updatePublishNetworkUI(){
   publishNetwork.querySelectorAll('button[data-network]').forEach(btn=>{
