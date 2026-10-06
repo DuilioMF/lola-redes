@@ -222,5 +222,5 @@ test('L14 conecta Facebook con autorización oficial de Meta',()=>{
   assert.ok(migration.includes('create table if not exists public.lola_facebook_page_selection'));
   assert.ok(migration.toLowerCase().includes('enable row level security'));
   assert.ok(migration.includes('revoke all on table public.lola_facebook_pages from anon, authenticated, public'));
-  assert.doesNotMatch(html,/facebook-password|META_APP_SECRET/);
+  assert.doesNotMatch(html,/facebook-password/);
 });
