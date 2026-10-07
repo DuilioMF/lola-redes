@@ -34,14 +34,27 @@ function secret(name: string): string {
 }
 
 function facebookAppId(): string {
-  const value = Deno.env.get("FACEBOOK_APP_ID") || Deno.env.get("META_APP_ID");
-  if (!value) throw new Error("Falta configurar FACEBOOK_APP_ID para conectar Facebook.");
+  const value = (Deno.env.get("FACEBOOK_APP_ID") || "").trim();
+  if (!value) {
+    throw new Error(
+      "Facebook todavía no está configurado: falta FACEBOOK_APP_ID. La conexión de Facebook debe usar una app de Meta propia y no reutilizar la configuración de Instagram.",
+    );
+  }
+  if (!/^\d+$/.test(value)) {
+    throw new Error(
+      "FACEBOOK_APP_ID no es válido. Debe ser el identificador numérico de la app de Meta configurada para Facebook Login.",
+    );
+  }
   return value;
 }
 
 function facebookAppSecret(): string {
-  const value = Deno.env.get("FACEBOOK_APP_SECRET") || Deno.env.get("META_APP_SECRET");
-  if (!value) throw new Error("Falta configurar FACEBOOK_APP_SECRET para conectar Facebook.");
+  const value = (Deno.env.get("FACEBOOK_APP_SECRET") || "").trim();
+  if (!value) {
+    throw new Error(
+      "Facebook todavía no está configurado: falta FACEBOOK_APP_SECRET para la app de Meta.",
+    );
+  }
   return value;
 }
 
