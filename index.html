@@ -60,7 +60,7 @@ radial-gradient(circle at 22% 75%,#cba45d10 0,transparent 24%),
 </header>
 <section class="hero"><div class="ey" id="lola-version">ESPECIALISTA DE DOINGLIO · comprobando versión</div><h1>Hola, soy <em>Lola.</em></h1><p class="lead">¿En qué puedo ayudarte? No necesitás saber de redes. Contame qué querés lograr y yo te voy guiando.</p><div class="voice">🎙 Conversación por voz · <button id="lola-greet" type="button" style="border:0;background:transparent;color:inherit;font:inherit;font-weight:800;cursor:pointer">Escuchar a Lola</button></div></section>
 <section class="channels">
-<article class="channel" id="facebook-channel"><strong>Facebook</strong><br><span id="facebook-status">● Sin conectar</span><select id="facebook-page-select" class="ig-profile-select" hidden aria-label="Página de Facebook"></select><div class="ig-actions"><button id="facebook-connect" type="button">Conectar Facebook</button><button id="facebook-change" class="ig-change" type="button" hidden>Autorizar otra cuenta</button><button id="facebook-disconnect" class="ig-disconnect" type="button" hidden>Desconectar</button></div><small id="facebook-note" class="ig-note">Autorizá tu cuenta de Meta y Lola te muestra las Páginas de Facebook que administrás.</small></article>
+<article class="channel" id="facebook-channel"><strong>Facebook</strong><br><span id="facebook-status">● Sin conectar</span><select id="facebook-page-select" class="ig-profile-select" hidden aria-label="Página de Facebook"></select><div class="ig-actions"><button id="facebook-connect" type="button">Conectar Facebook</button><button id="facebook-change" class="ig-change" type="button" hidden>Autorizar otra cuenta</button><button id="facebook-disconnect" class="ig-disconnect" type="button" hidden>Desconectar</button></div><small id="facebook-note" class="ig-note">Autorizá tu cuenta de Meta y Lola te muestra las Páginas de Facebook que administrás.</small><div id="facebook-setup-guide" class="ig-note" hidden>Para abrir la autorización hace falta una app propia de Meta. Lola te guía: abrí Meta for Developers, creá una app y luego cargá FACEBOOK_APP_ID y FACEBOOK_APP_SECRET en los secretos de Supabase. No uses las credenciales de Instagram.</div><div class="ig-actions"><button id="facebook-setup" type="button" hidden>Configurar Facebook paso a paso</button><a id="facebook-meta-open" class="ig-create" href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer" hidden>Abrir Meta for Developers</a></div></article>
 <article class="channel" id="instagram-channel"><strong>Instagram</strong><br><span id="instagram-status">● Sin conectar</span><select id="instagram-profile-select" class="ig-profile-select" hidden aria-label="Perfil de Instagram"></select><select id="instagram-available-select" class="ig-profile-select" hidden aria-label="Cuenta de Instagram ya autorizada"></select><div class="ig-actions"><button id="instagram-connect" type="button">Ya tengo Instagram</button><a id="instagram-create" class="ig-create" href="https://www.instagram.com/accounts/signup/" target="_blank" rel="noopener noreferrer">Crear cuenta de Instagram</a><button id="instagram-change" class="ig-change" type="button" hidden>Autorizar otra cuenta</button><button id="instagram-link-existing" class="ig-change" type="button" hidden>Usar cuenta ya autorizada</button><button id="instagram-disconnect" class="ig-disconnect" type="button" hidden>Desconectar</button></div><small id="instagram-note" class="ig-note">Si todavía no tenés cuenta, creala primero. Después volvé a Lola y elegí “Ya tengo Instagram”.</small></article>
 <article class="channel"><strong>WhatsApp</strong><br><span>● Sin conectar</span></article>
 <article class="channel"><strong>LinkedIn</strong><br><span>● Sin conectar</span></article>
@@ -411,6 +411,18 @@ function facebookMessage(message,type=''){
   facebookNote.className='ig-note'+(type?' '+type:'');
   facebookNote.textContent=message;
 }
+function facebookSetupNeeded(message){
+  return /FACEBOOK_APP_ID|FACEBOOK_APP_SECRET|app de Meta propia/i.test(String(message||''));
+}
+function showFacebookSetupGuide(message){
+  const guide=document.getElementById('facebook-setup-guide');
+  const setup=document.getElementById('facebook-setup');
+  const meta=document.getElementById('facebook-meta-open');
+  if(guide)guide.hidden=false;
+  if(setup)setup.hidden=false;
+  if(meta)meta.hidden=false;
+  facebookMessage('Todavía falta configurar la app propia de Facebook. Lola te guía para completarlo; Instagram no se modifica.','error');
+}
 async function facebookAction(action,payload={}){
   const {data,error}=await sb.functions.invoke('lola-facebook-oauth',{body:{action,...payload}});
   if(error){
@@ -419,9 +431,19 @@ async function facebookAction(action,payload={}){
       const p=await error.context?.clone?.().json();
       message=p?.message||message;
     }catch(_){}
+    if(facebookSetupNeeded(message)){
+      showFacebookSetupGuide(message);
+      throw new Error('Falta configurar la aplicación propia de Facebook. Usá “Configurar Facebook paso a paso” para continuar.');
+    }
     throw new Error(message||error.message||'No se pudo conectar con Facebook.');
   }
-  if(data?.error)throw new Error(data.message||'No se pudo conectar con Facebook.');
+  if(data?.error){
+    if(facebookSetupNeeded(data.message)){
+      showFacebookSetupGuide(data.message);
+      throw new Error('Falta configurar la aplicación propia de Facebook. Usá “Configurar Facebook paso a paso” para continuar.');
+    }
+    throw new Error(data.message||'No se pudo conectar con Facebook.');
+  }
   return data;
 }
 function renderFacebookPages(pages){
@@ -1081,6 +1103,14 @@ facebookPageSelect.addEventListener('change',async()=>{
   }finally{
     facebookPageSelect.disabled=false;
   }
+});
+document.getElementById('facebook-setup')?.addEventListener('click',()=>{
+  const guide=document.getElementById('facebook-setup-guide');
+  const meta=document.getElementById('facebook-meta-open');
+  if(guide)guide.hidden=false;
+  if(meta)meta.hidden=false;
+  facebookMessage('Paso 1: abrí Meta for Developers y creá una app propia. Paso 2: configurá Facebook Login y el callback que te indicará Lola. Paso 3: guardá el App ID y App Secret en Supabase. Después volvé acá y tocá Conectar Facebook.','');
+  window.open('https://developers.facebook.com/apps/','_blank','noopener,noreferrer');
 });
 facebookConnect.addEventListener('click',async()=>{
   facebookConnect.disabled=true;
