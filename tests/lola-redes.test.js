@@ -214,7 +214,9 @@ test('L14 conecta Facebook con autorización oficial de Meta',()=>{
   assert.ok(backend.includes('pages_read_engagement'));
   assert.ok(backend.includes('pages_manage_posts'));
   assert.ok(backend.includes('/me/accounts'));
-  assert.ok(backend.includes('META_APP_SECRET'));
+  assert.ok(backend.includes('Deno.env.get("FACEBOOK_APP_ID")'));
+  assert.ok(backend.includes('Deno.env.get("FACEBOOK_APP_SECRET")'));
+  assert.doesNotMatch(backend,/META_APP_(?:ID|SECRET)/);
   assert.ok(backend.includes('/auth/v1/user'));
 
   assert.ok(migration.includes('create table if not exists public.lola_facebook_pages'));
