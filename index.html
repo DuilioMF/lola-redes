@@ -1223,7 +1223,18 @@ instagramConnect.addEventListener('click',async()=>{
   try{
     const data=await instagramAction('start');
     if(!data.authorize_url)throw new Error('Meta no devolvió el enlace de autorización.');
-    location.assign(data.authorize_url);
+    const authUrl=new URL(data.authorize_url);
+    if(authUrl.protocol!=='https:'||authUrl.hostname!=='www.instagram.com'||authUrl.pathname!=='/oauth/authorize')throw new Error('El enlace de autorización de Instagram no es válido.');
+    const link=document.createElement('a');
+    link.href=authUrl.href;
+    link.textContent='Continuar en Instagram';
+    link.className='instagram-oauth-direct-link';
+    link.style.cssText='display:inline-block;margin:12px 0;padding:12px 16px;border:1px solid #cba45d;border-radius:8px;color:#efe8d8;text-decoration:underline';
+    document.querySelectorAll('.instagram-oauth-direct-link').forEach(el=>el.remove());
+    instagramConnect.parentElement.appendChild(link);
+    instagramMessage('Tocá «Continuar en Instagram» para autorizar la cuenta.');
+    instagramConnect.disabled=false;
+    instagramChange.disabled=false;
   }catch(error){
     instagramConnect.disabled=false;
     instagramMessage(error.message||'No se pudo iniciar la conexión.','error');
@@ -1235,7 +1246,18 @@ instagramChange.addEventListener('click',async()=>{
   try{
     const data=await instagramAction('add');
     if(!data.authorize_url)throw new Error('Meta no devolvió el enlace de autorización.');
-    location.assign(data.authorize_url);
+    const authUrl=new URL(data.authorize_url);
+    if(authUrl.protocol!=='https:'||authUrl.hostname!=='www.instagram.com'||authUrl.pathname!=='/oauth/authorize')throw new Error('El enlace de autorización de Instagram no es válido.');
+    const link=document.createElement('a');
+    link.href=authUrl.href;
+    link.textContent='Continuar en Instagram';
+    link.className='instagram-oauth-direct-link';
+    link.style.cssText='display:inline-block;margin:12px 0;padding:12px 16px;border:1px solid #cba45d;border-radius:8px;color:#efe8d8;text-decoration:underline';
+    document.querySelectorAll('.instagram-oauth-direct-link').forEach(el=>el.remove());
+    instagramConnect.parentElement.appendChild(link);
+    instagramMessage('Tocá «Continuar en Instagram» para autorizar la cuenta.');
+    instagramConnect.disabled=false;
+    instagramChange.disabled=false;
   }catch(error){
     instagramChange.disabled=false;
     instagramMessage(error.message||'No se pudo cambiar el perfil.','error');
